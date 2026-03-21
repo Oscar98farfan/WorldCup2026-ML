@@ -1,0 +1,51 @@
+# =============================================
+# WorldCup2026-ML — .gitignore
+# =============================================
+
+# Entorno virtual
+venv/
+env/
+.env/
+.venv/
+
+# Datos procesados (se regeneran con 01_etl.py)
+data/processed/
+
+# Modelos entrenados (se regeneran con 02_train.py)
+models/
+
+# Outputs (se regeneran con los scripts)
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# IMPORTANTE: los datos RAW SÍ se suben a Git
+# data/raw/ NO está en este gitignore
