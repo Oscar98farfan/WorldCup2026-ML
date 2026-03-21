@@ -25,20 +25,41 @@ PROPÓSITO:
     Así simulamos exactamente cómo usaríamos el modelo en
     la realidad. El CV estándar mezcla años y es optimista.
 
-TARGET NUEVO vs PROYECTO ANTERIOR:
-    Antes:  llega_lejos (¿llegó a cuartos el equipo?)
-    Ahora:  gana_partido (¿ganó ese partido específico?)
-    Esto permite usar el modelo partido a partido en el
-    simulador para predecir cualquier enfrentamiento.
+DOS MODELOS EN ESTE SCRIPT:
+
+    MODELO DE EVALUACIÓN:
+        Entrena con datos < 2022, evalúa en 2022.
+        Sirve para saber si el modelo es confiable antes
+        de usarlo en producción. Si las métricas son buenas,
+        procedemos a construir el modelo de producción.
+        Este modelo NO se guarda en .pkl.
+
+    MODELO DE PRODUCCIÓN:
+        Entrena con datos <= 2022 (incluye 2022).
+        Este es el que se guarda en .pkl y se usa para
+        predecir el Mundial 2026.
+        ¿Por qué incluir 2022? Porque más datos = mejor modelo.
+        Ya sabemos que funciona (lo validamos arriba), entonces
+        para predecir 2026 le damos toda la información disponible
+        incluyendo lo que pasó en Qatar 2022.
+
+        Ejemplo concreto: Morocco llegó a semis en 2022.
+        Si no incluimos 2022, el modelo no sabe eso y puede
+        subestimar a Morocco. Con 2022 incluido, su historial
+        ya refleja que es un equipo capaz de llegar lejos.
+
+TARGET:
+    gana_partido = 1 si el equipo ganó ese partido
+    gana_partido = 0 si perdió o empató
 
 ENTRADA:
     data/processed/model_dataset.csv → generado por 01_etl.py
 
 SALIDA:
-    models/match_predictor.pkl → modelo entrenado
-    models/scaler.pkl          → escalador StandardScaler
+    models/match_predictor.pkl → modelo de PRODUCCIÓN (<= 2022)
+    models/scaler.pkl          → escalador del modelo de producción
     models/features.pkl        → lista de features usadas
-    models/metrics.json        → métricas de validación
+    models/metrics.json        → métricas del modelo de evaluación
 
 CÓMO EJECUTAR:
     python 02_train.py
@@ -73,19 +94,6 @@ from src.feature_engineering import MODEL_FEATURES, TARGET
 # ===========================================================
 # CONFIGURACIÓN DEL MODELO
 # ===========================================================
-# Parámetros del Gradient Boosting definidos aquí para que
-# sean fáciles de encontrar y modificar si se necesita.
-#
-# n_estimators=200: número de árboles. Más árboles = más preciso
-#   pero más lento. 200 es un buen balance para este dataset.
-# max_depth=3: profundidad máxima de cada árbol. Valores bajos
-#   previenen overfitting. 3 es el estándar para GB.
-# learning_rate=0.05: qué tan rápido aprende. Valores bajos +
-#   muchos árboles = mejor generalización.
-# subsample=0.8: usa el 80% de los datos en cada árbol.
-#   Añade aleatoriedad y reduce overfitting.
-# random_state=42: semilla para reproducibilidad. Con la misma
-#   semilla siempre obtienes el mismo modelo.
 
 GB_PARAMS = dict(
     n_estimators=200,
@@ -95,24 +103,17 @@ GB_PARAMS = dict(
     random_state=42
 )
 
-# Años que se usan como "test" en el walk-forward
-# Solo incluimos mundiales con cobertura de ranking FIFA ≥ 80%
 WALK_FORWARD_YEARS = [2006, 2010, 2014, 2018, 2022]
-
-# Año que se usa como test final (el más reciente disponible)
-TEST_YEAR = 2022
+EVAL_YEAR = 2022
 
 
 # ===========================================================
-# PASO 1: CARGAR DATASET PROCESADO
+# PASO 1: CARGAR DATASET
 # ===========================================================
 
 def load_dataset() -> pd.DataFrame:
     """
     Carga el dataset generado por 01_etl.py.
-
-    Si no existe, muestra un mensaje claro indicando que
-    hay que correr 01_etl.py primero.
 
     RETORNA:
         DataFrame con todas las features y el target
@@ -144,19 +145,10 @@ def walk_forward_validation(df: pd.DataFrame) -> dict:
 
     PROCESO:
         Para cada año en WALK_FORWARD_YEARS:
-        1. Train: todos los datos de años ANTERIORES a ese año
-        2. Test:  solo los datos de ese año específico
+        1. Train: todos los datos ANTERIORES a ese año
+        2. Test:  solo los datos de ese año
         3. Entrenar modelo en train, evaluar en test
         4. Guardar métricas
-
-    ¿POR QUÉ ES IMPORTANTE?
-        Un CV estándar mezclaría datos de 2022 con datos de 2006
-        para validar 2010, lo cual no tiene sentido: no puedes
-        usar el futuro para predecir el pasado.
-        Walk-Forward respeta el tiempo y da métricas honestas.
-
-    PARÁMETROS:
-        df → DataFrame completo con features y target
 
     RETORNA:
         dict con métricas por año y promedios
@@ -175,7 +167,6 @@ def walk_forward_validation(df: pd.DataFrame) -> dict:
         train_mask = df["year"] < year_test
         test_mask  = df["year"] == year_test
 
-        # Verificar que hay datos suficientes
         if train_mask.sum() < 50 or test_mask.sum() == 0:
             print(f"  {year_test:>6} → datos insuficientes, omitiendo")
             continue
@@ -185,21 +176,17 @@ def walk_forward_validation(df: pd.DataFrame) -> dict:
         y_tr = df.loc[train_mask, TARGET]
         y_te = df.loc[test_mask,  TARGET]
 
-        # Escalar — IMPORTANTE: fit solo en train, transform en ambos
-        # Si hiciéramos fit en todo el dataset, el test "contaminaría"
-        # la escala y los resultados serían optimistas
-        scaler_wf  = StandardScaler()
-        X_tr_sc    = scaler_wf.fit_transform(X_tr)
-        X_te_sc    = scaler_wf.transform(X_te)
+        # fit SOLO en train — nunca en test
+        scaler_wf = StandardScaler()
+        X_tr_sc   = scaler_wf.fit_transform(X_tr)
+        X_te_sc   = scaler_wf.transform(X_te)
 
-        # Entrenar y evaluar
         modelo_wf = GradientBoostingClassifier(**GB_PARAMS)
         modelo_wf.fit(X_tr_sc, y_tr)
 
         y_prob = modelo_wf.predict_proba(X_te_sc)[:, 1]
         y_pred = modelo_wf.predict(X_te_sc)
 
-        # Calcular métricas
         try:
             auc_val = roc_auc_score(y_te, y_prob)
         except ValueError:
@@ -232,107 +219,139 @@ def walk_forward_validation(df: pd.DataFrame) -> dict:
           f"{wf_df['accuracy'].std():>10.3f}")
 
     return {
-        "by_year":      results,
-        "mean_auc":     float(wf_df["auc"].mean()),
-        "std_auc":      float(wf_df["auc"].std()),
-        "mean_f1":      float(wf_df["f1_macro"].mean()),
-        "std_f1":       float(wf_df["f1_macro"].std()),
-        "mean_acc":     float(wf_df["accuracy"].mean()),
+        "by_year":  results,
+        "mean_auc": float(wf_df["auc"].mean()),
+        "std_auc":  float(wf_df["auc"].std()),
+        "mean_f1":  float(wf_df["f1_macro"].mean()),
+        "std_f1":   float(wf_df["f1_macro"].std()),
+        "mean_acc": float(wf_df["accuracy"].mean()),
     }
 
 
 # ===========================================================
-# PASO 3: ENTRENAR MODELO FINAL
+# PASO 3: MODELO DE EVALUACIÓN (train < 2022, test = 2022)
 # ===========================================================
 
-def train_final_model(df: pd.DataFrame):
+def train_evaluation_model(df: pd.DataFrame):
     """
-    Entrena el modelo final usando todos los datos hasta TEST_YEAR.
-    Evalúa en TEST_YEAR como test de referencia.
+    Entrena el modelo de EVALUACIÓN para reportar métricas.
 
-    ¿POR QUÉ ENTRENAR CON DATOS HASTA 2022 Y NO CON TODO?
-        Queremos tener un test set "visto" (2022) para reportar
-        las métricas finales del modelo. En producción real
-        (predicción 2026) el modelo se re-entrena con todos los
-        datos disponibles incluyendo 2022.
-
-    PARÁMETROS:
-        df → DataFrame completo
+    Entrena con datos < 2022 y evalúa en 2022.
+    Responde: ¿funciona el modelo en datos reales?
+    Este modelo NO se guarda en .pkl.
 
     RETORNA:
-        modelo    → GradientBoostingClassifier entrenado
-        scaler    → StandardScaler ajustado
-        métricas  → dict con resultados en test 2022
+        metrics_eval, y_test, y_prob, y_pred
     """
     print("\n" + "="*55)
-    print(f"  PASO 3: Entrenando modelo final (test = {TEST_YEAR})")
+    print(f"  PASO 3: Modelo de evaluación")
+    print(f"          Train: datos < {EVAL_YEAR}")
+    print(f"          Test:  datos = {EVAL_YEAR}")
     print("="*55)
 
-    train_mask = df["year"] < TEST_YEAR
-    test_mask  = df["year"] == TEST_YEAR
+    train_mask = df["year"] < EVAL_YEAR
+    test_mask  = df["year"] == EVAL_YEAR
 
     X_train = df.loc[train_mask, MODEL_FEATURES].fillna(0)
     X_test  = df.loc[test_mask,  MODEL_FEATURES].fillna(0)
     y_train = df.loc[train_mask, TARGET]
     y_test  = df.loc[test_mask,  TARGET]
 
-    print(f"\n  Train: {len(X_train)} filas  "
-          f"(mundiales {int(df.loc[train_mask,'year'].min())}-{TEST_YEAR-1})")
-    print(f"  Test:  {len(X_test)} filas  (mundial {TEST_YEAR})")
+    print(f"\n  Train: {len(X_train)} filas (mundiales hasta {EVAL_YEAR-1})")
+    print(f"  Test:  {len(X_test)} filas  (mundial {EVAL_YEAR})")
 
-    # Escalar
-    scaler = StandardScaler()
-    X_train_sc = scaler.fit_transform(X_train)
-    X_test_sc  = scaler.transform(X_test)
+    scaler_eval = StandardScaler()
+    X_train_sc  = scaler_eval.fit_transform(X_train)
+    X_test_sc   = scaler_eval.transform(X_test)
 
-    # Entrenar
-    modelo = GradientBoostingClassifier(**GB_PARAMS)
-    modelo.fit(X_train_sc, y_train)
+    modelo_eval = GradientBoostingClassifier(**GB_PARAMS)
+    modelo_eval.fit(X_train_sc, y_train)
 
-    # Evaluar
-    y_prob = modelo.predict_proba(X_test_sc)[:, 1]
-    y_pred = modelo.predict(X_test_sc)
+    y_prob = modelo_eval.predict_proba(X_test_sc)[:, 1]
+    y_pred = modelo_eval.predict(X_test_sc)
 
     auc_val = roc_auc_score(y_test, y_prob)
     f1_val  = f1_score(y_test, y_pred, average="macro", zero_division=0)
     acc_val = accuracy_score(y_test, y_pred)
 
-    print(f"\n  Métricas en test {TEST_YEAR}:")
+    print(f"\n  Métricas en test {EVAL_YEAR}:")
     print(f"    AUC:      {auc_val:.3f}")
     print(f"    F1-macro: {f1_val:.3f}")
     print(f"    Accuracy: {acc_val:.3f}")
     print(f"\n{classification_report(y_test, y_pred, target_names=['No ganó','Ganó'], zero_division=0)}")
 
-    metrics = {
-        "test_year": TEST_YEAR,
-        "auc":       float(auc_val),
-        "f1_macro":  float(f1_val),
-        "accuracy":  float(acc_val),
+    if auc_val >= 0.75:
+        print(f"  ✅ AUC={auc_val:.3f} — modelo confiable para producción")
+    elif auc_val >= 0.65:
+        print(f"  ⚠️  AUC={auc_val:.3f} — modelo aceptable")
+    else:
+        print(f"  ❌ AUC={auc_val:.3f} — modelo débil, revisar features")
+
+    metrics_eval = {
+        "eval_year":  EVAL_YEAR,
+        "train_size": int(len(X_train)),
+        "test_size":  int(len(X_test)),
+        "auc":        float(auc_val),
+        "f1_macro":   float(f1_val),
+        "accuracy":   float(acc_val),
     }
 
-    return modelo, scaler, metrics, y_test, y_prob, y_pred
+    return metrics_eval, y_test, y_prob, y_pred
 
 
 # ===========================================================
-# PASO 4: IMPORTANCIA DE FEATURES
+# PASO 4: MODELO DE PRODUCCIÓN (train <= 2022)
+# ===========================================================
+
+def train_production_model(df: pd.DataFrame):
+    """
+    Entrena el modelo de PRODUCCIÓN para predecir el Mundial 2026.
+
+    Incluye los datos de 2022 porque:
+    - El modelo de evaluación ya confirmó que el enfoque funciona
+    - Más datos históricos = mejor generalización
+    - 2022 es el mundial más reciente y el más relevante para 2026
+
+    RETORNA:
+        modelo_prod, scaler_prod
+    """
+    print("\n" + "="*55)
+    print(f"  PASO 4: Modelo de producción")
+    print(f"          Train: datos <= {EVAL_YEAR} (incluye {EVAL_YEAR})")
+    print(f"          Este modelo predice el Mundial 2026")
+    print("="*55)
+
+    train_mask = df["year"] <= EVAL_YEAR
+
+    X_train = df.loc[train_mask, MODEL_FEATURES].fillna(0)
+    y_train = df.loc[train_mask, TARGET]
+
+    print(f"\n  Train: {len(X_train)} filas")
+    print(f"  Años:  {sorted(df.loc[train_mask, 'year'].unique())}")
+
+    scaler_prod = StandardScaler()
+    X_train_sc  = scaler_prod.fit_transform(X_train)
+
+    modelo_prod = GradientBoostingClassifier(**GB_PARAMS)
+    modelo_prod.fit(X_train_sc, y_train)
+
+    print(f"\n  ✅ Modelo de producción listo")
+    print(f"     Entrenado con {len(X_train)} partidos (1930-{EVAL_YEAR})")
+
+    return modelo_prod, scaler_prod
+
+
+# ===========================================================
+# PASO 5: IMPORTANCIA DE FEATURES
 # ===========================================================
 
 def show_feature_importance(modelo, paths: dict) -> None:
     """
-    Muestra y guarda la importancia de cada feature en el modelo.
-
-    ¿QUÉ ES LA IMPORTANCIA DE FEATURES?
-        En Gradient Boosting, cada feature recibe un score
-        que indica cuánto contribuyó a las predicciones.
-        Features con importancia alta son las más decisivas.
-        Features con importancia ~0 no aportan nada.
-
-    PARÁMETROS:
-        modelo → modelo entrenado
-        paths  → rutas del proyecto (para guardar la gráfica)
+    Muestra y guarda la importancia de cada feature del
+    modelo de producción.
     """
     print("\n" + "="*55)
-    print("  PASO 4: Importancia de features")
+    print("  PASO 5: Importancia de features")
     print("="*55)
 
     imp_df = pd.DataFrame({
@@ -340,129 +359,91 @@ def show_feature_importance(modelo, paths: dict) -> None:
         "Importancia": modelo.feature_importances_
     }).sort_values("Importancia", ascending=False)
 
-    print(f"\n  {'Feature':<25} {'Importancia':>12} {'Barra'}")
+    print(f"\n  {'Feature':<25} {'Importancia':>12}  Barra")
     print("  " + "-"*55)
     for _, row in imp_df.iterrows():
         barra = "█" * int(row["Importancia"] * 100)
         print(f"  {row['Feature']:<25} {row['Importancia']:>12.4f}  {barra}")
 
-    # Guardar gráfica
     plots_dir = paths["outputs"] / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     plt.figure(figsize=(10, 7))
     imp_sorted = imp_df.sort_values("Importancia", ascending=True)
-    plt.barh(imp_sorted["Feature"], imp_sorted["Importancia"], color="#3498db")
+    plt.barh(imp_sorted["Feature"], imp_sorted["Importancia"],
+             color="#3498db")
     plt.xlabel("Importancia")
-    plt.title("Importancia de Features — Gradient Boosting")
+    plt.title(f"Importancia de Features — Modelo Producción (<= {EVAL_YEAR})")
     plt.tight_layout()
-    plt.savefig(plots_dir / "feature_importance.png", bbox_inches="tight", dpi=120)
+    plt.savefig(plots_dir / "feature_importance.png",
+                bbox_inches="tight", dpi=120)
     plt.close()
-    print(f"\n  ✅ Gráfica guardada: outputs/plots/feature_importance.png")
+    print(f"\n  ✅ outputs/plots/feature_importance.png")
 
 
 # ===========================================================
-# PASO 5: GUARDAR MODELO Y MÉTRICAS
+# PASO 6: GUARDAR MODELO Y MÉTRICAS
 # ===========================================================
 
-def save_model(modelo, scaler, wf_metrics: dict, final_metrics: dict, paths: dict) -> None:
+def save_model(modelo_prod, scaler_prod, wf_metrics, eval_metrics, paths):
     """
-    Guarda el modelo, el scaler, la lista de features y las métricas.
+    Guarda el modelo de producción y las métricas.
 
-    ¿QUÉ SE GUARDA Y POR QUÉ?
-
-    match_predictor.pkl:
-        El modelo entrenado serializado. 'Serializado' significa
-        convertido a bytes para guardarlo en disco. Se carga con
-        pickle.load() en 03_simulate.py sin necesidad de reentrenar.
-
-    scaler.pkl:
-        El escalador StandardScaler ajustado. DEBE guardarse junto
-        al modelo porque transforma los datos con la misma escala
-        que se usó en el entrenamiento. Sin él las predicciones
-        serían incorrectas.
-
-    features.pkl:
-        La lista exacta de features en el orden correcto.
-        El modelo es sensible al orden de las columnas. Si cambias
-        el orden o agregas una columna sin actualizar este archivo,
-        las predicciones serán incorrectas.
-
-    metrics.json:
-        Las métricas de validación en formato legible. Útil para
-        comparar versiones del modelo y documentar el rendimiento.
+    Lo que se guarda:
+        match_predictor.pkl → modelo producción (entrenado <= 2022)
+        scaler.pkl          → escalador correspondiente
+        features.pkl        → lista de features en orden correcto
+        metrics.json        → métricas del modelo de evaluación
     """
     print("\n" + "="*55)
-    print("  PASO 5: Guardando modelo")
+    print("  PASO 6: Guardando modelo de producción")
     print("="*55)
 
     models_dir = paths["models"]
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    # Guardar modelo
     with open(models_dir / "match_predictor.pkl", "wb") as f:
-        pickle.dump(modelo, f)
-    print(f"\n  ✅ models/match_predictor.pkl")
+        pickle.dump(modelo_prod, f)
+    print(f"\n  ✅ models/match_predictor.pkl  (producción <= {EVAL_YEAR})")
 
-    # Guardar scaler
     with open(models_dir / "scaler.pkl", "wb") as f:
-        pickle.dump(scaler, f)
+        pickle.dump(scaler_prod, f)
     print(f"  ✅ models/scaler.pkl")
 
-    # Guardar lista de features
     with open(models_dir / "features.pkl", "wb") as f:
         pickle.dump(MODEL_FEATURES, f)
     print(f"  ✅ models/features.pkl")
 
-    # Guardar métricas en JSON (legible por humanos)
     all_metrics = {
-        "model":          "GradientBoostingClassifier",
-        "parameters":     GB_PARAMS,
-        "features":       MODEL_FEATURES,
-        "target":         TARGET,
-        "walk_forward":   wf_metrics,
-        "test_final":     final_metrics,
+        "nota": (
+            f"Métricas del modelo de EVALUACIÓN (train < {EVAL_YEAR}, "
+            f"test = {EVAL_YEAR}). El .pkl guardado es el modelo de "
+            f"PRODUCCIÓN (train <= {EVAL_YEAR})."
+        ),
+        "model":        "GradientBoostingClassifier",
+        "parameters":   GB_PARAMS,
+        "features":     MODEL_FEATURES,
+        "target":       TARGET,
+        "walk_forward": wf_metrics,
+        "evaluation":   eval_metrics,
     }
     with open(models_dir / "metrics.json", "w") as f:
         json.dump(all_metrics, f, indent=2)
     print(f"  ✅ models/metrics.json")
 
-    print(f"""
-  Para cargar el modelo en otro script:
-
-    import pickle
-    with open('models/match_predictor.pkl', 'rb') as f:
-        modelo = pickle.load(f)
-    with open('models/scaler.pkl', 'rb') as f:
-        scaler = pickle.load(f)
-    with open('models/features.pkl', 'rb') as f:
-        features = pickle.load(f)
-    """)
-
 
 # ===========================================================
-# PASO 6: GRÁFICAS DE EVALUACIÓN
+# PASO 7: GRÁFICAS
 # ===========================================================
 
-def save_evaluation_plots(
-    y_test, y_prob, y_pred,
-    wf_metrics: dict,
-    paths: dict
-) -> None:
-    """
-    Genera y guarda las gráficas de evaluación del modelo.
-
-    GRÁFICAS:
-        1. Walk-Forward por año: AUC y F1-macro a través del tiempo
-        2. Matriz de confusión en test 2022
-        3. Curva ROC en test 2022
-    """
+def save_evaluation_plots(y_test, y_prob, y_pred, wf_metrics, paths):
+    """Genera las gráficas de evaluación del modelo."""
     plots_dir = paths["outputs"] / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    # 1. Walk-Forward por año
+    # Walk-Forward
     wf_years = [r["year"]     for r in wf_metrics["by_year"]]
     wf_aucs  = [r["auc"]      for r in wf_metrics["by_year"]]
     wf_f1s   = [r["f1_macro"] for r in wf_metrics["by_year"]]
@@ -471,46 +452,47 @@ def save_evaluation_plots(
                  color="#3498db", linewidth=2, markersize=8)
     axes[0].plot(wf_years, wf_f1s,  "s-", label="F1-macro",
                  color="#e74c3c", linewidth=2, markersize=8)
-    axes[0].axhline(0.5, color="gray", linestyle="--",
-                    alpha=0.5, label="Azar (0.5)")
-    axes[0].axhline(wf_metrics["mean_auc"], color="#3498db",
-                    linestyle=":", alpha=0.7,
-                    label=f"AUC prom={wf_metrics['mean_auc']:.3f}")
-    axes[0].set_title("Walk-Forward Validation por Mundial")
-    axes[0].set_xlabel("Año del mundial de prueba")
+    axes[0].axhline(0.5, color="gray", linestyle="--", alpha=0.5)
+    axes[0].set_title("Walk-Forward Validation")
+    axes[0].set_xlabel("Año de prueba")
     axes[0].set_ylabel("Score")
     axes[0].legend(fontsize=8)
     axes[0].grid(True, alpha=0.3)
     axes[0].set_ylim(0.3, 1.0)
 
-    # 2. Matriz de confusión
+    # Confusión
     cm = confusion_matrix(y_test, y_pred)
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=axes[1],
-                xticklabels=["No ganó", "Ganó"],
-                yticklabels=["No ganó", "Ganó"])
-    axes[1].set_title(f"Matriz de Confusión — Test {TEST_YEAR}")
+                xticklabels=["No ganó","Ganó"],
+                yticklabels=["No ganó","Ganó"])
+    axes[1].set_title(f"Confusión — Test {EVAL_YEAR}")
     axes[1].set_ylabel("Real")
     axes[1].set_xlabel("Predicción")
 
-    # 3. Curva ROC
-    from sklearn.metrics import roc_curve, auc
+    # ROC
+    from sklearn.metrics import roc_curve, auc as sk_auc
     fpr, tpr, _ = roc_curve(y_test, y_prob)
-    auc_val     = auc(fpr, tpr)
+    auc_val     = sk_auc(fpr, tpr)
     axes[2].plot(fpr, tpr, color="#3498db", linewidth=2,
-                 label=f"Gradient Boosting (AUC={auc_val:.3f})")
-    axes[2].plot([0,1],[0,1], "k--", alpha=0.5, label="Azar")
-    axes[2].set_xlabel("Tasa Falsos Positivos")
-    axes[2].set_ylabel("Tasa Verdaderos Positivos")
-    axes[2].set_title(f"Curva ROC — Test {TEST_YEAR}")
+                 label=f"GB (AUC={auc_val:.3f})")
+    axes[2].plot([0,1],[0,1],"k--",alpha=0.5)
+    axes[2].set_xlabel("Falsos Positivos")
+    axes[2].set_ylabel("Verdaderos Positivos")
+    axes[2].set_title(f"Curva ROC — Test {EVAL_YEAR}")
     axes[2].legend(fontsize=9)
     axes[2].grid(True, alpha=0.3)
 
-    plt.suptitle("WorldCup2026-ML — Evaluación del Modelo", fontsize=13)
+    plt.suptitle(
+        f"WorldCup2026-ML — Evaluación del Modelo\n"
+        f"Modelo evaluación: train < {EVAL_YEAR}, test = {EVAL_YEAR}  |  "
+        f"Modelo producción guardado: train <= {EVAL_YEAR}",
+        fontsize=10
+    )
     plt.tight_layout()
     plt.savefig(plots_dir / "model_evaluation.png",
                 bbox_inches="tight", dpi=120)
     plt.close()
-    print(f"  ✅ Gráfica guardada: outputs/plots/model_evaluation.png")
+    print(f"  ✅ outputs/plots/model_evaluation.png")
 
 
 # ===========================================================
@@ -530,27 +512,34 @@ def main():
     # Paso 2: walk-forward validation
     wf_metrics = walk_forward_validation(df)
 
-    # Paso 3: entrenar modelo final
-    modelo, scaler, final_metrics, y_test, y_prob, y_pred = train_final_model(df)
+    # Paso 3: modelo de evaluación (train < 2022, test = 2022)
+    eval_metrics, y_test, y_prob, y_pred = train_evaluation_model(df)
 
-    # Paso 4: importancia de features
-    show_feature_importance(modelo, paths)
+    # Paso 4: modelo de producción (train <= 2022)
+    modelo_prod, scaler_prod = train_production_model(df)
 
-    # Paso 5: guardar modelo
-    save_model(modelo, scaler, wf_metrics, final_metrics, paths)
+    # Paso 5: importancia de features
+    show_feature_importance(modelo_prod, paths)
 
-    # Paso 6: gráficas
+    # Paso 6: guardar modelo de producción
+    save_model(modelo_prod, scaler_prod, wf_metrics, eval_metrics, paths)
+
+    # Paso 7: gráficas
     save_evaluation_plots(y_test, y_prob, y_pred, wf_metrics, paths)
 
     print("\n" + "="*55)
     print("  ENTRENAMIENTO COMPLETADO")
-    print(f"  Walk-Forward AUC:  {wf_metrics['mean_auc']:.3f} "
+    print(f"\n  Evaluación (train < {EVAL_YEAR}, test = {EVAL_YEAR}):")
+    print(f"    Walk-Forward AUC: {wf_metrics['mean_auc']:.3f} "
           f"± {wf_metrics['std_auc']:.3f}")
-    print(f"  Walk-Forward F1:   {wf_metrics['mean_f1']:.3f} "
+    print(f"    Walk-Forward F1:  {wf_metrics['mean_f1']:.3f} "
           f"± {wf_metrics['std_f1']:.3f}")
-    print(f"  Test {TEST_YEAR} AUC:   {final_metrics['auc']:.3f}")
-    print(f"  Test {TEST_YEAR} F1:    {final_metrics['f1_macro']:.3f}")
-    print("  Siguiente paso: python 03_simulate.py")
+    print(f"    Test {EVAL_YEAR} AUC:  {eval_metrics['auc']:.3f}")
+    print(f"    Test {EVAL_YEAR} F1:   {eval_metrics['f1_macro']:.3f}")
+    print(f"\n  Producción (train <= {EVAL_YEAR}):")
+    print(f"    ✅ Guardado en models/match_predictor.pkl")
+    print(f"    Listo para predecir el Mundial 2026")
+    print(f"\n  Siguiente paso: python 03_simulate.py")
     print("="*55 + "\n")
 
 
