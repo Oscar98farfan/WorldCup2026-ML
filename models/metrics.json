@@ -1,0 +1,90 @@
+{
+  "nota": "M\u00e9tricas del modelo de EVALUACI\u00d3N (train < 2022, test = 2022). El .pkl guardado es el modelo de PRODUCCI\u00d3N (train <= 2022).",
+  "model": "GradientBoostingClassifier",
+  "parameters": {
+    "n_estimators": 200,
+    "max_depth": 3,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "random_state": 42
+  },
+  "features": [
+    "goals",
+    "penalty",
+    "rank",
+    "points",
+    "rank_diff",
+    "points_diff",
+    "rank_ratio",
+    "same_conf",
+    "is_home",
+    "is_host",
+    "rank_tier",
+    "hist_mundiales",
+    "hist_max_ronda",
+    "hist_avg_ronda",
+    "hist_veces_qf",
+    "hist_veces_sf",
+    "hist_veces_final",
+    "hist_avg_goles",
+    "hist_tendencia"
+  ],
+  "target": "gana_partido",
+  "walk_forward": {
+    "by_year": [
+      {
+        "year": 2006,
+        "n_train": 1288,
+        "n_test": 128,
+        "auc": 0.9335849056603773,
+        "f1_macro": 0.834668044432963,
+        "accuracy": 0.84375
+      },
+      {
+        "year": 2010,
+        "n_train": 1416,
+        "n_test": 128,
+        "auc": 0.8643589743589744,
+        "f1_macro": 0.7465346534653465,
+        "accuracy": 0.7578125
+      },
+      {
+        "year": 2014,
+        "n_train": 1544,
+        "n_test": 128,
+        "auc": 0.9372353673723537,
+        "f1_macro": 0.8585114222549741,
+        "accuracy": 0.859375
+      },
+      {
+        "year": 2018,
+        "n_train": 1672,
+        "n_test": 128,
+        "auc": 0.8463262764632627,
+        "f1_macro": 0.7597597597597597,
+        "accuracy": 0.765625
+      },
+      {
+        "year": 2022,
+        "n_train": 1800,
+        "n_test": 128,
+        "auc": 0.8956456456456456,
+        "f1_macro": 0.8011804908356632,
+        "accuracy": 0.8046875
+      }
+    ],
+    "mean_auc": 0.8954302339001228,
+    "std_auc": 0.040558958225706085,
+    "mean_f1": 0.8001308741497415,
+    "std_f1": 0.04770898230985007,
+    "mean_acc": 0.80625
+  },
+  "evaluation": {
+    "eval_year": 2022,
+    "train_size": 1800,
+    "test_size": 128,
+    "auc": 0.8956456456456456,
+    "f1_macro": 0.8011804908356632,
+    "accuracy": 0.8046875
+  }
+}
