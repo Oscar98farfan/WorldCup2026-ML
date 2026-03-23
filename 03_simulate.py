@@ -69,7 +69,7 @@ from src.simulator import simulate_tournament, get_results_summary
 # CONFIGURACIÓN DE LA SIMULACIÓN
 # ===========================================================
 
-N_SIMULATIONS = 10_000  # número de simulaciones Monte Carlo
+N_SIMULATIONS = 1_000  # número de simulaciones Monte Carlo
 RANDOM_SEED   = 42       # semilla para reproducibilidad
 WORLDCUP_YEAR = 2026     # año del mundial a simular
 
