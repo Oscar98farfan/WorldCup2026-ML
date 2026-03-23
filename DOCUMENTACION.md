@@ -207,15 +207,21 @@ Monte Carlo es una técnica matemática que resuelve problemas difíciles usando
 
 ### Cómo funciona en este proyecto
 
-En lugar de dardos, usamos simulaciones del torneo completo:
+En lugar de dardos, usamos simulaciones del torneo completo **respetando el fixture oficial**:
 
 **Simulación número 1:**
-1. Grupo A: México vs Sudáfrica → el modelo dice México tiene 68% de ganar → se lanza el dado → México gana
-2. Grupo A: México vs Corea del Sur → el modelo dice 55% → México gana
-3. ... (todos los partidos de grupos)
-4. Clasifican los 2 primeros de cada grupo + 8 mejores terceros
-5. Se simulan octavos, cuartos, semis y final de la misma forma
-6. En esta simulación, digamos que Argentina gana el mundial
+1. **Fase de grupos:** cada equipo juega solo contra los 3 de su grupo.
+   - Grupo C: Brasil vs Marruecos → el modelo dice Brasil tiene 72% → Brasil gana
+   - Grupo C: Brasil vs Haití → el modelo dice Brasil tiene 85% → Brasil gana
+   - Grupo C: Brasil vs Escocia → Brasil gana → Brasil pasa 1ro del Grupo C
+   - Marruecos también pasa como 2do del Grupo C
+2. **Octavos:** los cruces siguen el fixture oficial de FIFA.
+   - Brasil (1ro Grupo C) enfrenta al 2do del Grupo D — **nunca a Marruecos**
+   - Marruecos (2do Grupo C) enfrenta al 1ro del Grupo D — **nunca a Brasil**
+   - Brasil y Marruecos solo podrían encontrarse en la **final**
+3. **Cuartos, semis y final:** el bracket mantiene separados a los equipos
+   que venían de partes distintas del cuadro
+4. En esta simulación, digamos que Argentina gana el mundial
 
 **Simulación número 2:**
 1. Los mismos partidos, pero esta vez los dados caen diferente
@@ -302,8 +308,8 @@ Un grupo donde un equipo tiene 90%+ y los demás tienen 30-40% es un "grupo fác
 
 ### Las anomalías que vale la pena entender
 
-**Brasil posición 43 con solo 0.4% de ser campeón:**
-Brasil tiene el mejor historial mundialista de la historia (22 mundiales, 5 títulos) pero cayó muy bajo en las predicciones. ¿Por qué? Quedó en el **Grupo C con Marruecos** (semifinalista en 2022), lo que hace su grupo difícil. Además, el modelo no tiene información sobre el estado actual del equipo (lesiones, forma reciente, nuevo entrenador).
+**Brasil posición 43 con solo 0.4% de ser campeón (resultado con simulador anterior):**
+Este resultado era incorrecto porque el simulador anterior mezclaba aleatoriamente los clasificados en octavos. Brasil (Grupo C) y Marruecos (también Grupo C) se encontraban en muchas simulaciones en octavos, cuando en la realidad nunca pueden enfrentarse antes de la final. Eso perjudicaba artificialmente a Brasil. Con el simulador corregido (fixture oficial), los resultados de Brasil mejorarán significativamente al no enfrentar a Marruecos hasta fases avanzadas.
 
 **Bélgica como favorita:**
 Bélgica tiene ranking 3 del mundo y quedó en el **Grupo G con Egipto, Irán y Nueva Zelanda**, un grupo relativamente asequible. El modelo detecta esto y le da buenas probabilidades de llegar lejos.
@@ -336,7 +342,7 @@ Centraliza toda la lectura de archivos. Si mañana `matches.csv` se renombra a `
 Todo el código que convierte datos crudos en variables útiles para el modelo está aquí. Tanto `01_etl.py` como `03_simulate.py` lo usan. Si hubiera que cambiar cómo se calcula el historial de un equipo, se cambia en un solo lugar.
 
 ### `src/simulator.py` — El motor de la simulación
-La lógica del torneo (grupos, octavos, cuartos, semis, final) está separada de los scripts principales. Si en el futuro quisieras cambiar las reglas (por ejemplo, simular con partidos de ida y vuelta), solo modificas este archivo.
+La lógica del torneo (grupos, octavos, cuartos, semis, final) está separada de los scripts principales. Respeta el fixture oficial del Mundial 2026: los cruces de octavos están predefinidos según grupo y posición, garantizando que equipos del mismo grupo nunca se enfrenten antes de la final. Si en el futuro quisieras cambiar las reglas, solo modificas este archivo.
 
 ### `01_etl.py` — Limpieza y preparación
 Lee los datos crudos y produce el dataset limpio. Si consigues datos nuevos, solo corres este script y todo lo demás se actualiza.
