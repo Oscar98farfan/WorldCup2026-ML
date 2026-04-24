@@ -17,6 +17,9 @@ models/
 # Outputs (se regeneran con los scripts)
 outputs/
 
+# Outputs Historial(se regeneran con los scripts)
+HistorialSalidas/
+
 # Python
 __pycache__/
 *.py[cod]
