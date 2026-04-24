@@ -219,28 +219,40 @@ def plot_top_candidates(df: pd.DataFrame, paths: dict) -> None:
 
     fig, ax = plt.subplots(figsize=(12, 8))
 
-    rondas = [
-        ("prob_r16",    "Octavos",  COLORS["r16"]),
-        ("prob_qf",     "Cuartos",  COLORS["qf"]),
-        ("prob_sf",     "Semis",    COLORS["sf"]),
-        ("prob_final",  "Final",    COLORS["final"]),
-        ("prob_winner", "Campeón",  COLORS["winner"]),
+    # Detectar columnas disponibles (el simulador con bloques
+    # agrega prob_r32 que el anterior no tenía)
+    todas_rondas = [
+        ("prob_r32",    "Clasifica",  COLORS["r16"]),
+        ("prob_r16",    "Octavos",    COLORS["qf"]),
+        ("prob_qf",     "Cuartos",    COLORS["sf"]),
+        ("prob_sf",     "Semis",      COLORS["final"]),
+        ("prob_final",  "Final",      COLORS["winner"]),
+        ("prob_winner", "Campeón",    "#0d2137"),
     ]
+    rondas = [(col, lbl, clr) for col, lbl, clr in todas_rondas
+              if col in top16.columns]
 
-    x       = np.arange(len(top16))
+    x        = np.arange(len(top16))
     n_rondas = len(rondas)
-    width   = 0.15
+    width    = 0.13
 
     for i, (col, label, color) in enumerate(rondas):
         offset = (i - n_rondas // 2) * width
         ax.bar(x + offset, top16[col], width,
                label=label, color=color, alpha=0.9)
 
+    # Agregar bloque en las etiquetas si está disponible
+    if "bloque" in top16.columns:
+        labels = [f"{row['team']}\n({row['bloque']})"
+                  for _, row in top16.iterrows()]
+    else:
+        labels = top16["team"].tolist()
+
     ax.set_xticks(x)
-    ax.set_xticklabels(top16["team"], rotation=45,
-                       ha="right", fontsize=9)
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
     ax.set_ylabel("Probabilidad", fontsize=11)
-    ax.set_title("Top 16 Candidatos — Probabilidad por Ronda",
+    ax.set_title("Top 16 Candidatos — Probabilidad por Ronda\n"
+                 "(IZQ/DER indica el bloque del equipo)",
                  fontsize=13, pad=10)
     ax.legend(fontsize=9)
     ax.set_ylim(0, 1.0)
