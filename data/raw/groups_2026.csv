@@ -2,11 +2,11 @@ group,team,confirmed,placeholder_for
 A,Mexico,yes,
 A,South Africa,yes,
 A,Korea Republic,yes,
-A,Denmark,no,Play-off D (Czech Republic/Denmark)
+A,Czechia,no,Play-off D (Czech Republic/Denmark)
 B,Canada,yes,
 B,Qatar,yes,
 B,Switzerland,yes,
-B,Italy,no,Play-off A (Italy/Wales)
+B,Bosnia and Herzegovina,no,Play-off A (Italy/Wales)
 C,Brazil,yes,
 C,Morocco,yes,
 C,Haiti,yes,
@@ -14,15 +14,15 @@ C,Scotland,yes,
 D,USA,yes,
 D,Paraguay,yes,
 D,Australia,yes,
-D,Turkey,no,Play-off C (Turkey/Romania)
+D,Türkiye,no,Play-off C (Turkey/Romania)
 E,Germany,yes,
 E,Curacao,yes,
-E,CÃ´te d'Ivoire,yes,
+E,Côte d'Ivoire,yes,
 E,Ecuador,yes,
 F,Netherlands,yes,
 F,Japan,yes,
 F,Tunisia,yes,
-F,Ukraine,no,Play-off B (Ukraine/Sweden/Poland)
+F,Sweden,no,Play-off B (Ukraine/Sweden/Poland)
 G,Belgium,yes,
 G,Egypt,yes,
 G,IR Iran,yes,
