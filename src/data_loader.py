@@ -165,7 +165,8 @@ def load_groups_2026() -> pd.DataFrame:
             f"No se encontró groups_2026.csv en {RAW_DIR}"
         )
 
-    df = pd.read_csv(path)
+    # df = pd.read_csv(path)
+    df = pd.read_csv(path, encoding="latin-1")
 
     # Mostrar resumen de equipos confirmados vs pendientes
     confirmados = (df["confirmed"] == "yes").sum()

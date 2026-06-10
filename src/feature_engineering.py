@@ -80,17 +80,36 @@ ROUND_MAP = {
 # Normalización de nombres de países entre los dos datasets.
 # matches.csv usa un nombre, rankings.csv puede usar otro.
 # Clave: nombre en matches.csv → valor: nombre en rankings.csv
+# COUNTRY_NAME_MAP = {
+#     "USA":              "USA",
+#     "South Korea":      "Korea Republic",
+#     "Korea Republic":   "Korea Republic",
+#     "Iran":             "IR Iran",
+#     "IR Iran":          "IR Iran",
+#     "Ivory Coast":      "Côte d'Ivoire",
+#     "Côte d'Ivoire":    "CÃ´te d'Ivoire",
+#     "Czech Republic":   "Czechia",
+#     "Ireland":          "Republic of Ireland",
+#     "Cabo Verde":       "Cabo Verde",
+#     "Congo DR":         "Congo DR",
+# }
+
 COUNTRY_NAME_MAP = {
-    "USA":              "USA",
-    "South Korea":      "Korea Republic",
-    "Korea Republic":   "Korea Republic",
-    "Iran":             "IR Iran",
-    "IR Iran":          "IR Iran",
-    "Ivory Coast":      "Côte d'Ivoire",
-    "Czech Republic":   "Czechia",
-    "Ireland":          "Republic of Ireland",
-    "Cabo Verde":       "Cabo Verde",
-    "Congo DR":         "Congo DR",
+    "USA":                    "USA",
+    "South Korea":            "Korea Republic",
+    "Korea Republic":         "Korea Republic",
+    "Iran":                   "IR Iran",
+    "IR Iran":                "IR Iran",
+    "Ivory Coast":            "CÃ´te d'Ivoire",
+    "Côte d'Ivoire":          "CÃ´te d'Ivoire",  # fix encoding
+    "Czech Republic":         "Czechia",
+    "Ireland":                "Republic of Ireland",
+    "Cabo Verde":             "Cabo Verde",
+    "Congo DR":               "Congo DR",
+    "Türkiye":                "Turkey",           # fix nuevo
+    "Turkey":                 "Turkey",
+    "Bosnia and Herzegovina": "Bosnia and Herzegovina",
+    "Curacao":                "Curacao",
 }
 
 # Features que usa el modelo — definidas aquí para que todos

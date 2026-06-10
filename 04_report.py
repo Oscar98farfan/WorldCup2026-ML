@@ -16,10 +16,21 @@ PROPÓSITO:
     - Agregar nuevas visualizaciones sin tocar la simulación
 
 SALIDAS:
-    outputs/plots/predictions_by_round.png  → gráfica principal
-    outputs/plots/top_candidates.png        → top 16 candidatos
-    outputs/plots/group_analysis.png        → análisis por grupo
+    outputs/plots/predictions_by_round.png  → gráfica principal (barras apiladas)
+    outputs/plots/top_candidates.png        → top 16 candidatos por ronda
+    outputs/plots/group_analysis.png        → análisis por grupo (12 subplots)
+    outputs/plots/bracket_comparison.png    → NUEVA: IZQ vs DER cara a cara
     outputs/report_2026.txt                 → reporte en texto
+
+NOTAS SOBRE LA SEPARACIÓN DE BLOQUES:
+    El Mundial 2026 divide los 12 grupos en dos bloques:
+        IZQ → grupos A, B, C, D, E, F
+        DER → grupos G, H, I, J, K, L
+    Los equipos de un bloque NO pueden cruzarse con los del
+    otro hasta la final. Esto se refleja en todas las gráficas:
+    - Las barras se colorean por bloque (azul=IZQ, naranja=DER)
+    - La gráfica de bracket muestra ambas ramas por separado
+    - El reporte de texto incluye una sección por bloque
 
 CÓMO EJECUTAR:
     python 04_report.py
@@ -44,16 +55,38 @@ from src.data_loader import get_paths, load_groups_2026
 # ===========================================================
 # CONFIGURACIÓN VISUAL
 # ===========================================================
-# Paleta de colores por ronda
-# Verde más intenso = ronda más avanzada
+
+# Colores de ronda (verde pálido → azul oscuro conforme avanza)
 COLORS = {
     "winner": "#1a5276",   # azul oscuro  — campeón
     "final":  "#2980b9",   # azul medio   — final
     "sf":     "#27ae60",   # verde oscuro — semis
     "qf":     "#82e0aa",   # verde claro  — cuartos
     "r16":    "#d5e8d4",   # verde pálido — octavos
+    "r32":    "#f0f7ee",   # casi blanco  — clasifica (fase de grupos)
     "out":    "#f2f2f2",   # gris         — eliminado
 }
+
+# Colores de bloque para distinguir IZQ vs DER en gráficas
+COLOR_IZQ = "#2e86c1"   # azul  — bloque IZQ (grupos A–F)
+COLOR_DER = "#e67e22"   # naranja — bloque DER (grupos G–L)
+
+BLOQUE_IZQ = ["A", "B", "C", "D", "E", "F"]
+BLOQUE_DER = ["G", "H", "I", "J", "K", "L"]
+
+
+# ===========================================================
+# HELPERS
+# ===========================================================
+
+def _get_bloque(grupo: str) -> str:
+    """Devuelve 'IZQ' o 'DER' según el grupo."""
+    return "IZQ" if grupo in BLOQUE_IZQ else "DER"
+
+
+def _bloque_color(bloque) -> str:
+    """Devuelve el color de barra según el bloque."""
+    return COLOR_IZQ if bloque == "IZQ" else COLOR_DER
 
 
 # ===========================================================
@@ -64,19 +97,13 @@ def load_results(paths: dict) -> pd.DataFrame:
     """
     Carga los resultados de la simulación.
 
-    ARCHIVO: outputs/simulation_results.csv
-    Generado por: 03_simulate.py
-
-    COLUMNAS:
-        team        → nombre del equipo
-        prob_r16    → probabilidad de pasar grupos (llegar a octavos)
-        prob_qf     → probabilidad de llegar a cuartos
-        prob_sf     → probabilidad de llegar a semis
-        prob_final  → probabilidad de llegar a la final
-        prob_winner → probabilidad de ser campeón
+    Si el CSV ya tiene columna 'bloque' (generado por la versión
+    con separación de bloques), la usa directamente.
+    Si no, la reconstruye a partir de 'grupo' o de groups_2026.csv.
 
     RETORNA:
-        DataFrame con resultados ordenados por prob_winner
+        DataFrame con resultados ordenados por prob_winner,
+        siempre con las columnas 'grupo' y 'bloque'.
     """
     print("\n" + "="*55)
     print("  PASO 1: Cargando resultados de la simulación")
@@ -93,15 +120,49 @@ def load_results(paths: dict) -> pd.DataFrame:
     df = pd.read_csv(results_path)
     df = df.sort_values("prob_winner", ascending=False).reset_index(drop=True)
 
+    # ── Asegurar columnas de bloque/grupo ──────────────────
+    if "grupo" not in df.columns or df["grupo"].isna().all():
+        # Reconstruir desde groups_2026.csv
+        try:
+            df_groups = load_groups_2026()
+            grupo_map = df_groups.set_index("team")["group"].to_dict()
+            df["grupo"] = df["team"].map(grupo_map).fillna("?")
+        except Exception:
+            df["grupo"] = "?"
+
+    if "bloque" not in df.columns or df["bloque"].isna().all():
+        df["bloque"] = df["grupo"].apply(
+            lambda g: _get_bloque(g) if g != "?" else "?"
+        )
+
+    # ── Asegurar prob_r32 (puede llamarse prob_r16 en versiones antiguas) ──
+    # En formato 2026: prob_r32 = pasar fase de grupos (clasificar entre 32)
+    #                  prob_r16 = pasar octavos (llegar a los 16)
+    if "prob_r32" not in df.columns:
+        # Versión antigua: prob_r16 era "pasar grupos". Renombramos para
+        # mantener consistencia con el nuevo esquema de 5 rondas.
+        df["prob_r32"] = df.get("prob_r16", 0.0)
+        # prob_r16 real (octavos) no está disponible → estimamos como prob_qf
+        # para que las gráficas no se rompan
+        if "prob_r16" in df.columns and "prob_qf" in df.columns:
+            # Ya existe prob_r16 como octavos: no hacer nada
+            pass
+        elif "prob_qf" in df.columns:
+            df["prob_r16"] = df["prob_qf"]
+
+    # ── Mostrar resumen por bloque ─────────────────────────
     print(f"\n  {len(df)} equipos cargados")
-    print(f"\n  Top 10 candidatos a campeón:")
-    print(f"  {'Equipo':<20} {'Campeón':>9} {'Final':>8} "
-          f"{'Semis':>7} {'Cuartos':>9}")
-    print("  " + "-"*55)
-    for _, row in df.head(10).iterrows():
-        print(f"  {row['team']:<20} {row['prob_winner']:>8.1%} "
-              f"{row['prob_final']:>7.1%} {row['prob_sf']:>6.1%} "
-              f"{row['prob_qf']:>8.1%}")
+    for bloque_name, grupos_bloque in [("IZQ (A–F)", BLOQUE_IZQ),
+                                        ("DER (G–L)", BLOQUE_DER)]:
+        sub = df[df["bloque"] == bloque_name.split()[0]]
+        if len(sub) == 0:
+            continue
+        print(f"\n  Bloque {bloque_name} — top 5:")
+        print(f"  {'Equipo':<20} {'Campeón':>9} {'Final':>8} {'Semis':>7}")
+        print("  " + "-"*46)
+        for _, row in sub.head(5).iterrows():
+            print(f"  {row['team']:<20} {row['prob_winner']:>8.1%} "
+                  f"{row['prob_final']:>7.1%} {row['prob_sf']:>6.1%}")
 
     return df
 
@@ -112,81 +173,83 @@ def load_results(paths: dict) -> pd.DataFrame:
 
 def plot_predictions_by_round(df: pd.DataFrame, paths: dict) -> None:
     """
-    Genera la gráfica principal del proyecto: barras apiladas
-    mostrando la probabilidad de llegar a cada ronda por equipo.
-
-    ¿POR QUÉ BARRAS APILADAS?
-        Permite ver de un vistazo tanto la probabilidad total
-        de avanzar como la distribución entre rondas.
-        Un equipo con mucho azul oscuro es candidato al título.
-        Un equipo con solo verde claro suele llegar a octavos
-        pero rara vez va más lejos.
+    Barras apiladas horizontales con probabilidad por ronda.
+    Las barras se colorean por bloque: azul=IZQ, naranja=DER.
 
     CÓMO LEER LA GRÁFICA:
-        Cada barra representa un equipo.
-        El largo total = probabilidad de pasar grupos.
-        Los colores muestran qué fracción llega a cada ronda:
-        Verde claro → octavos
-        Verde medio → cuartos
-        Verde oscuro → semis
-        Azul medio  → final
-        Azul oscuro → campeón
+        Largo total   = probabilidad de clasificar (pasar grupos)
+        Verde pálido  → clasifica (llega a octavos)
+        Verde claro   → cuartos de final
+        Verde oscuro  → semifinal
+        Azul medio    → final
+        Azul oscuro   → campeón
+        Borde azul    = equipo del bloque IZQ (grupos A–F)
+        Borde naranja = equipo del bloque DER (grupos G–L)
     """
     print("\n[04_report] Generando gráfica de predicciones por ronda...")
 
-    # Ordenar por probabilidad de llegar a semis (más informativo)
     df_plot = df.sort_values("prob_sf", ascending=True).copy()
 
     fig, ax = plt.subplots(figsize=(14, max(10, len(df_plot) * 0.35)))
 
-    # Construir barras apiladas
-    # Cada segmento es la diferencia entre rondas consecutivas
-    # para que visualmente cada color represente "llegar a esa ronda
-    # pero no a la siguiente"
-    p_r16    = df_plot["prob_r16"]
+    # Columnas de probabilidad disponibles
+    p_r32    = df_plot.get("prob_r32",   df_plot.get("prob_r16", 0))
+    p_r16    = df_plot.get("prob_r16",   df_plot.get("prob_qf", 0))
     p_qf     = df_plot["prob_qf"]
     p_sf     = df_plot["prob_sf"]
     p_final  = df_plot["prob_final"]
     p_winner = df_plot["prob_winner"]
 
-    # Diferencias entre rondas
-    seg_r16    = p_r16 - p_qf       # llega a octavos pero no a cuartos
-    seg_qf     = p_qf  - p_sf       # llega a cuartos pero no a semis
-    seg_sf     = p_sf  - p_final    # llega a semis pero no a la final
-    seg_final  = p_final - p_winner # llega a la final pero no gana
-    seg_winner = p_winner            # gana el mundial
+    # Segmentos (diferencia entre rondas)
+    seg_r32    = p_r32 - p_r16        # clasifica pero no pasa octavos
+    seg_r16    = p_r16 - p_qf         # octavos pero no cuartos
+    seg_qf     = p_qf  - p_sf         # cuartos pero no semis
+    seg_sf     = p_sf  - p_final      # semis pero no final
+    seg_final  = p_final - p_winner   # final pero no campeón
+    seg_winner = p_winner             # campeón
 
     y = range(len(df_plot))
 
-    # Dibujar segmentos de derecha a izquierda (acumulado)
-    ax.barh(y, seg_r16,    left=p_qf,     color=COLORS["r16"],
-            label="Octavos de final")
-    ax.barh(y, seg_qf,     left=p_sf,     color=COLORS["qf"],
-            label="Cuartos de final")
-    ax.barh(y, seg_sf,     left=p_final,  color=COLORS["sf"],
-            label="Semifinal")
-    ax.barh(y, seg_final,  left=p_winner, color=COLORS["final"],
-            label="Final")
-    ax.barh(y, seg_winner, left=0,        color=COLORS["winner"],
-            label="Campeón")
+    ax.barh(y, seg_r32,    left=p_r16,    color=COLORS["r32"],    label="Clasifica")
+    ax.barh(y, seg_r16,    left=p_qf,     color=COLORS["r16"],    label="Octavos")
+    ax.barh(y, seg_qf,     left=p_sf,     color=COLORS["qf"],     label="Cuartos")
+    ax.barh(y, seg_sf,     left=p_final,  color=COLORS["sf"],     label="Semifinal")
+    ax.barh(y, seg_final,  left=p_winner, color=COLORS["final"],  label="Final")
+    ax.barh(y, seg_winner, left=0,        color=COLORS["winner"], label="Campeón")
 
-    # Etiquetas de equipo y porcentaje de ganar
+    # Borde de color por bloque
+    for i, (_, row) in enumerate(df_plot.iterrows()):
+        bloque = row.get("bloque", "?")
+        bcolor = _bloque_color(bloque)
+        ax.barh(i, p_r32.iloc[i], left=0,
+                color="none", edgecolor=bcolor, linewidth=1.2)
+
+    # Etiquetas de equipo + porcentaje campeón
     ax.set_yticks(y)
     ax.set_yticklabels(df_plot["team"], fontsize=9)
 
-    # Agregar porcentaje del campeón al final de cada barra
     for i, (_, row) in enumerate(df_plot.iterrows()):
-        if row["prob_winner"] >= 0.01:  # solo si es > 1%
-            ax.text(row["prob_r16"] + 0.005, i,
+        if row["prob_winner"] >= 0.01:
+            ax.text(p_r32.iloc[i] + 0.005, i,
                     f"{row['prob_winner']:.1%}",
                     va="center", fontsize=7, color="#1a5276")
 
+    # Leyenda combinada: rondas + bloques
+    handles, labels = ax.get_legend_handles_labels()
+    izq_patch = mpatches.Patch(facecolor="white", edgecolor=COLOR_IZQ,
+                                linewidth=1.5, label="Bloque IZQ (A–F)")
+    der_patch = mpatches.Patch(facecolor="white", edgecolor=COLOR_DER,
+                                linewidth=1.5, label="Bloque DER (G–L)")
+    ax.legend(handles=handles + [izq_patch, der_patch],
+              loc="lower right", fontsize=8)
+
     ax.set_xlabel("Probabilidad", fontsize=11)
-    ax.set_title("Mundial 2026 — Predicciones por Ronda\n"
-                 "(Simulación Monte Carlo, 10,000 simulaciones)",
-                 fontsize=13, pad=15)
-    ax.legend(loc="lower right", fontsize=9)
-    ax.set_xlim(0, 1.05)
+    ax.set_title(
+        "Mundial 2026 — Predicciones por Ronda\n"
+        "(Monte Carlo 10,000 sim · borde azul = bloque A–F · borde naranja = bloque G–L)",
+        fontsize=12, pad=12
+    )
+    ax.set_xlim(0, 1.08)
     ax.grid(True, alpha=0.2, axis="x")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -206,59 +269,57 @@ def plot_predictions_by_round(df: pd.DataFrame, paths: dict) -> None:
 
 def plot_top_candidates(df: pd.DataFrame, paths: dict) -> None:
     """
-    Gráfica detallada de los 16 equipos con mayor probabilidad
-    de llegar a cuartos de final.
+    Top 16 equipos con mayor prob_winner.
+    Barras agrupadas (una barra por ronda por equipo).
+    Color de barra según el bloque del equipo.
 
-    Muestra 5 barras por equipo (una por ronda) para ver
-    claramente cómo se va filtrando cada equipo a medida
-    que avanza el torneo.
+    La etiqueta del eje X incluye el grupo y el bloque:
+        Argentina (G · IZQ)
     """
     print("[04_report] Generando gráfica de top candidatos...")
 
     top16 = df.head(16).copy()
 
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(14, 8))
 
-    # Detectar columnas disponibles (el simulador con bloques
-    # agrega prob_r32 que el anterior no tenía)
     todas_rondas = [
-        ("prob_r32",    "Clasifica",  COLORS["r16"]),
-        ("prob_r16",    "Octavos",    COLORS["qf"]),
-        ("prob_qf",     "Cuartos",    COLORS["sf"]),
-        ("prob_sf",     "Semis",      COLORS["final"]),
-        ("prob_final",  "Final",      COLORS["winner"]),
-        ("prob_winner", "Campeón",    "#0d2137"),
+        ("prob_r32",    "Clasifica",  COLORS["r32"]),
+        ("prob_r16",    "Octavos",    COLORS["r16"]),
+        ("prob_qf",     "Cuartos",    COLORS["qf"]),
+        ("prob_sf",     "Semis",      COLORS["sf"]),
+        ("prob_final",  "Final",      COLORS["final"]),
+        ("prob_winner", "Campeón",    COLORS["winner"]),
     ]
     rondas = [(col, lbl, clr) for col, lbl, clr in todas_rondas
               if col in top16.columns]
 
     x        = np.arange(len(top16))
     n_rondas = len(rondas)
-    width    = 0.13
+    width    = 0.12
 
     for i, (col, label, color) in enumerate(rondas):
-        offset = (i - n_rondas // 2) * width
+        offset = (i - n_rondas / 2 + 0.5) * width
         ax.bar(x + offset, top16[col], width,
-               label=label, color=color, alpha=0.9)
+               label=label, color=color, alpha=0.92)
 
-    # Agregar bloque en las etiquetas si está disponible
-    if "bloque" in top16.columns:
-        labels = [f"{row['team']}\n({row['bloque']})"
-                  for _, row in top16.iterrows()]
-    else:
-        labels = top16["team"].tolist()
+    # Etiqueta con nombre, grupo y bloque
+    labels = []
+    for _, row in top16.iterrows():
+        grupo  = row.get("grupo",  "?")
+        bloque = row.get("bloque", "?")
+        labels.append(f"{row['team']}\n(Grp {grupo} · {bloque})")
 
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+    ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=8)
     ax.set_ylabel("Probabilidad", fontsize=11)
-    ax.set_title("Top 16 Candidatos — Probabilidad por Ronda\n"
-                 "(IZQ/DER indica el bloque del equipo)",
-                 fontsize=13, pad=10)
-    ax.legend(fontsize=9)
-    ax.set_ylim(0, 1.0)
-    ax.yaxis.set_major_formatter(
-        plt.FuncFormatter(lambda y, _: f"{y:.0%}")
+    ax.set_title(
+        "Top 16 Candidatos — Probabilidad por Ronda\n"
+        "(IZQ = grupos A–F  ·  DER = grupos G–L)",
+        fontsize=12, pad=10
     )
+    ax.legend(fontsize=9, loc="upper right")
+    ax.set_ylim(0, 1.05)
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
     ax.grid(True, alpha=0.2, axis="y")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -276,53 +337,63 @@ def plot_top_candidates(df: pd.DataFrame, paths: dict) -> None:
 
 def plot_group_analysis(df: pd.DataFrame, paths: dict) -> None:
     """
-    Muestra la probabilidad de pasar grupos para cada equipo
-    organizado por su grupo en el torneo.
+    12 subplots (uno por grupo A–L) con probabilidad de
+    clasificar (pasar fase de grupos) por equipo.
 
-    Útil para identificar los grupos más competitivos (donde
-    ningún equipo tiene probabilidad dominante de pasar) vs
-    los grupos más desequilibrados.
+    Los subplots se organizan en dos filas de 6:
+        Fila 1: grupos A–F  (bloque IZQ, barras azules)
+        Fila 2: grupos G–L  (bloque DER, barras naranjas)
+
+    Línea roja punteada = 50% de probabilidad de referencia.
+    Barras naranja opaco = placeholder (equipo por confirmar).
     """
     print("[04_report] Generando análisis por grupo...")
 
     df_groups = load_groups_2026()
 
-    # Unir con probabilidades
+    # Columna de probabilidad de clasificar
+    prob_col = "prob_r32" if "prob_r32" in df.columns else "prob_r16"
+
     df_merged = df_groups.merge(
-        df[["team", "prob_r16", "prob_qf", "prob_winner"]],
+        df[["team", prob_col, "prob_qf", "prob_winner"]],
         on="team", how="left"
     ).fillna(0)
 
-    groups_sorted = sorted(df_merged["group"].unique())
-    n_groups = len(groups_sorted)
-    n_cols   = 4
-    n_rows   = (n_groups + n_cols - 1) // n_cols
+    # Ordenar grupos: A–F primera fila, G–L segunda fila
+    grupos_ordenados = BLOQUE_IZQ + BLOQUE_DER
+    grupos_presentes = [g for g in grupos_ordenados
+                        if g in df_merged["group"].unique()]
 
-    fig, axes = plt.subplots(n_rows, n_cols,
-                              figsize=(16, n_rows * 3.5))
+    n_cols = 6
+    n_rows = 2  # fila 1: IZQ, fila 2: DER
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(20, n_rows * 4.5))
     axes = axes.flatten()
 
-    for i, group_name in enumerate(groups_sorted):
+    for i, group_name in enumerate(grupos_presentes):
         ax = axes[i]
         group_data = df_merged[df_merged["group"] == group_name].copy()
-        group_data = group_data.sort_values("prob_r16", ascending=False)
+        group_data = group_data.sort_values(prob_col, ascending=False)
 
-        # Color según si es placeholder
+        bloque = _get_bloque(group_name)
+        base_color = COLOR_IZQ if bloque == "IZQ" else COLOR_DER
+
         colors = []
         for _, row in group_data.iterrows():
-            if row.get("confirmed", "yes") == "no":
-                colors.append("#f39c12")  # naranja — placeholder
+            confirmed = row.get("confirmed", "yes")
+            if str(confirmed) == "no":
+                colors.append("#f39c12")   # naranja — placeholder
             else:
-                colors.append("#3498db")  # azul    — confirmado
+                colors.append(base_color)  # color del bloque
 
-        bars = ax.bar(group_data["team"], group_data["prob_r16"],
-                      color=colors, alpha=0.85)
+        ax.bar(group_data["team"], group_data[prob_col],
+               color=colors, alpha=0.85)
+        ax.axhline(0.5, color="red", linestyle="--", alpha=0.4, linewidth=1)
 
-        # Línea de referencia: 50% de probabilidad
-        ax.axhline(0.5, color="red", linestyle="--",
-                   alpha=0.4, linewidth=1)
-
-        ax.set_title(f"Grupo {group_name}", fontsize=11, fontweight="bold")
+        bloque_label = "IZQ (A–F)" if bloque == "IZQ" else "DER (G–L)"
+        ax.set_title(f"Grupo {group_name}  [{bloque_label}]",
+                     fontsize=10, fontweight="bold",
+                     color=base_color)
         ax.set_ylim(0, 1.0)
         ax.set_xticklabels(group_data["team"], rotation=30,
                            ha="right", fontsize=7)
@@ -334,17 +405,25 @@ def plot_group_analysis(df: pd.DataFrame, paths: dict) -> None:
         ax.spines["right"].set_visible(False)
 
     # Ocultar ejes sobrantes
-    for j in range(i + 1, len(axes)):
+    for j in range(len(grupos_presentes), len(axes)):
         axes[j].set_visible(False)
 
     # Leyenda global
-    confirmed_patch   = mpatches.Patch(color="#3498db", label="Confirmado")
-    placeholder_patch = mpatches.Patch(color="#f39c12", label="Placeholder (por confirmar)")
-    fig.legend(handles=[confirmed_patch, placeholder_patch],
-               loc="lower right", fontsize=9)
+    izq_patch  = mpatches.Patch(color=COLOR_IZQ,  label="Bloque IZQ (grupos A–F)")
+    der_patch  = mpatches.Patch(color=COLOR_DER,  label="Bloque DER (grupos G–L)")
+    ph_patch   = mpatches.Patch(color="#f39c12",  label="Placeholder (por confirmar)")
+    line_patch = mpatches.Patch(color="red", alpha=0.5, label="Línea 50%")
+    
+    # fig.legend(handles=[izq_patch, der_patch, ph_patch, line_patch],
+    #            loc="lower center", ncol=4, fontsize=9, y=0.01)
+    fig.legend(handles=[izq_patch, der_patch, ph_patch, line_patch],
+           loc="lower center", ncol=4, fontsize=9)
 
-    fig.suptitle("Probabilidad de pasar la fase de grupos por equipo",
-                 fontsize=14, y=1.01)
+    fig.suptitle(
+        "Probabilidad de clasificar (pasar fase de grupos) — Mundial 2026\n"
+        "Fila superior: Bloque IZQ (grupos A–F) · Fila inferior: Bloque DER (grupos G–L)",
+        fontsize=13, y=1.02
+    )
     plt.tight_layout()
     plt.savefig(paths["outputs"] / "plots" / "group_analysis.png",
                 bbox_inches="tight", dpi=150)
@@ -353,75 +432,196 @@ def plot_group_analysis(df: pd.DataFrame, paths: dict) -> None:
 
 
 # ===========================================================
-# PASO 5: REPORTE EN TEXTO
+# PASO 5: GRÁFICA DE BRACKET IZQ vs DER  (NUEVA)
+# ===========================================================
+
+def plot_bracket_comparison(df: pd.DataFrame, paths: dict) -> None:
+    """
+    NUEVA gráfica — Comparación de los dos bloques del cuadro.
+
+    Muestra en dos columnas (IZQ | DER) los equipos de cada
+    bloque con sus probabilidades de llegar a semis, final y
+    ser campeón. Permite ver de un vistazo qué bloque tiene
+    los favoritos y qué tan equilibrado está cada cuadro.
+
+    Diseño:
+        ┌────────────────┬────────────────┐
+        │  BLOQUE IZQ    │  BLOQUE DER    │
+        │  (grupos A–F)  │  (grupos G–L)  │
+        │   barras azul  │  barras naranj │
+        └────────────────┴────────────────┘
+    """
+    print("[04_report] Generando gráfica de bracket IZQ vs DER...")
+
+    df_izq = df[df["bloque"] == "IZQ"].head(12).copy()
+    df_der = df[df["bloque"] == "DER"].head(12).copy()
+
+    # Ordenar por prob_sf dentro de cada bloque
+    df_izq = df_izq.sort_values("prob_sf", ascending=True)
+    df_der = df_der.sort_values("prob_sf", ascending=True)
+
+    fig, (ax_izq, ax_der) = plt.subplots(1, 2, figsize=(16, 7),
+                                          sharey=False)
+
+    def _draw_bracket_half(ax, df_half, bloque_name, base_color):
+        p_sf     = df_half["prob_sf"]
+        p_final  = df_half["prob_final"]
+        p_winner = df_half["prob_winner"]
+
+        seg_sf     = p_sf - p_final
+        seg_final  = p_final - p_winner
+        seg_winner = p_winner
+
+        y = range(len(df_half))
+        ax.barh(y, seg_sf,     left=p_final,  color=COLORS["sf"],
+                label="Semis", alpha=0.85)
+        ax.barh(y, seg_final,  left=p_winner, color=COLORS["final"],
+                label="Final", alpha=0.85)
+        ax.barh(y, seg_winner, left=0,        color=COLORS["winner"],
+                label="Campeón", alpha=0.95)
+
+        ax.set_yticks(list(y))
+        ax.set_yticklabels(
+            [f"{row['team']}  (Grp {row.get('grupo','?')})"
+             for _, row in df_half.iterrows()],
+            fontsize=9
+        )
+
+        # Anotar porcentaje de campeón
+        for i, (_, row) in enumerate(df_half.iterrows()):
+            if row["prob_winner"] >= 0.005:
+                ax.text(row["prob_sf"] + 0.005, i,
+                        f"{row['prob_winner']:.1%}",
+                        va="center", fontsize=7.5,
+                        color="#1a5276", fontweight="bold")
+
+        ax.set_xlabel("Probabilidad", fontsize=10)
+        ax.set_xlim(0, max(p_sf.max() * 1.25, 0.3))
+        ax.set_title(
+            f"Bloque {bloque_name}",
+            fontsize=13, fontweight="bold", color=base_color, pad=10
+        )
+        ax.legend(fontsize=8, loc="lower right")
+        ax.grid(True, alpha=0.2, axis="x")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    _draw_bracket_half(ax_izq, df_izq, "IZQ (grupos A–F)", COLOR_IZQ)
+    _draw_bracket_half(ax_der, df_der, "DER (grupos G–L)", COLOR_DER)
+
+    fig.suptitle(
+        "Cuadro del Mundial 2026 — Probabilidades de avance por bloque\n"
+        "(Los dos bloques no se cruzan hasta la final)",
+        fontsize=13, y=1.02
+    )
+    plt.tight_layout()
+    plt.savefig(paths["outputs"] / "plots" / "bracket_comparison.png",
+                bbox_inches="tight", dpi=150)
+    plt.close()
+    print(f"  ✅ outputs/plots/bracket_comparison.png")
+
+
+# ===========================================================
+# PASO 6: REPORTE EN TEXTO
 # ===========================================================
 
 def generate_text_report(df: pd.DataFrame, paths: dict) -> None:
     """
-    Genera un reporte en texto plano con los resultados
-    completos de la simulación.
-
-    ¿POR QUÉ UN REPORTE EN TEXTO?
-        Las gráficas son visuales pero no son fáciles de
-        compartir en mensajes o documentos. El reporte .txt
-        se puede copiar y pegar en cualquier lugar.
+    Reporte en texto plano con los resultados completos.
+    Incluye una sección separada por bloque (IZQ y DER).
     """
     print("[04_report] Generando reporte en texto...")
 
     lines = []
-    lines.append("=" * 65)
+    lines.append("=" * 70)
     lines.append("  WORLDCUP2026-ML — PREDICCIONES MUNDIAL 2026")
     lines.append("  Simulación Monte Carlo (10,000 simulaciones)")
-    lines.append("=" * 65)
+    lines.append("  Separación de bloques: IZQ (A–F) | DER (G–L)")
+    lines.append("=" * 70)
 
-    lines.append(f"\n{'Pos':>4}  {'Equipo':<22} {'Octavos':>9} "
-                 f"{'Cuartos':>9} {'Semis':>7} {'Final':>7} {'Campeón':>9}")
-    lines.append("  " + "-"*65)
+    # ── Tabla completa ─────────────────────────────────────
+    lines.append(f"\n{'Pos':>4}  {'Equipo':<22} {'Grp':>4} {'Bloque':>7} "
+                 f"{'Clasifica':>10} {'Octavos':>8} {'Cuartos':>8} "
+                 f"{'Semis':>7} {'Final':>7} {'Campeón':>9}")
+    lines.append("  " + "-"*85)
+
+    prob_r32_col = "prob_r32" if "prob_r32" in df.columns else "prob_r16"
 
     for i, row in df.iterrows():
         lines.append(
             f"{i+1:>4}  {row['team']:<22} "
-            f"{row['prob_r16']:>8.1%} "
-            f"{row['prob_qf']:>8.1%} "
+            f"{str(row.get('grupo', '?')):>4} "
+            f"{str(row.get('bloque', '?')):>7}  "
+            f"{row.get(prob_r32_col, 0):>9.1%} "
+            f"{row['prob_r16']:>7.1%} "
+            f"{row['prob_qf']:>7.1%} "
             f"{row['prob_sf']:>6.1%} "
             f"{row['prob_final']:>6.1%} "
             f"{row['prob_winner']:>8.1%}"
         )
 
-    # Candidatos a semifinales (prob_sf >= 20%)
-    sf_candidates = df[df["prob_sf"] >= 0.20]
-    lines.append(f"\n\n{'='*65}")
-    lines.append("  CANDIDATOS A SEMIFINALES (prob >= 20%)")
-    lines.append("=" * 65)
-    for _, row in sf_candidates.iterrows():
-        lines.append(f"  {row['team']:<22} → {row['prob_sf']:.1%} "
-                     f"(campeón: {row['prob_winner']:.1%})")
+    # ── Por bloque ─────────────────────────────────────────
+    for bloque_tag, bloque_label in [("IZQ", "BLOQUE IZQ — grupos A, B, C, D, E, F"),
+                                      ("DER", "BLOQUE DER — grupos G, H, I, J, K, L")]:
+        sub = df[df["bloque"] == bloque_tag]
+        if sub.empty:
+            continue
 
-    # Candidatos al título (prob_winner >= 5%)
+        lines.append(f"\n\n{'='*70}")
+        lines.append(f"  {bloque_label}")
+        lines.append("=" * 70)
+        lines.append(f"  {'Equipo':<22} {'Grp':>4}  {'Semis':>7} "
+                     f"{'Final':>7} {'Campeón':>9}")
+        lines.append("  " + "-"*55)
+        for _, row in sub.iterrows():
+            lines.append(
+                f"  {row['team']:<22} {str(row.get('grupo','?')):>4}  "
+                f"{row['prob_sf']:>6.1%} "
+                f"{row['prob_final']:>6.1%} "
+                f"{row['prob_winner']:>8.1%}"
+            )
+
+    # ── Candidatos al título ───────────────────────────────
     title_candidates = df[df["prob_winner"] >= 0.05]
-    lines.append(f"\n\n{'='*65}")
+    lines.append(f"\n\n{'='*70}")
     lines.append("  CANDIDATOS AL TÍTULO (prob >= 5%)")
-    lines.append("=" * 65)
+    lines.append("=" * 70)
     for _, row in title_candidates.iterrows():
-        lines.append(f"  {row['team']:<22} → {row['prob_winner']:.1%}")
+        bloque = row.get("bloque", "?")
+        grupo  = row.get("grupo",  "?")
+        lines.append(f"  {row['team']:<22} Grp {grupo} [{bloque}]  "
+                     f"→ {row['prob_winner']:.1%}")
 
-    lines.append(f"\n\n{'='*65}")
+    # ── Favoritos por bloque ───────────────────────────────
+    lines.append(f"\n\n{'='*70}")
+    lines.append("  FAVORITO POR BLOQUE")
+    lines.append("=" * 70)
+    for bloque_tag in ["IZQ", "DER"]:
+        sub = df[df["bloque"] == bloque_tag]
+        if sub.empty:
+            continue
+        fav = sub.iloc[0]
+        lines.append(
+            f"  Bloque {bloque_tag}: {fav['team']:<18} "
+            f"(campeón: {fav['prob_winner']:.1%} · "
+            f"semis: {fav['prob_sf']:.1%})"
+        )
+
+    lines.append(f"\n\n{'='*70}")
     lines.append("  NOTAS")
-    lines.append("=" * 65)
+    lines.append("=" * 70)
+    lines.append("  - Los bloques IZQ y DER NO se cruzan hasta la final")
     lines.append("  - 6 equipos son placeholders (play-offs pendientes)")
     lines.append("  - Actualizar data/raw/groups_2026.csv cuando se")
     lines.append("    confirmen y correr: python 03_simulate.py")
     lines.append("  - El modelo predice partido a partido usando")
     lines.append("    ranking FIFA histórico + estadísticas mundialistas")
     lines.append("  - Walk-Forward AUC promedio: ~0.68 (ver metrics.json)")
-    lines.append("=" * 65)
+    lines.append("=" * 70)
 
     report_text = "\n".join(lines)
-
-    # Imprimir en consola
     print("\n" + report_text)
 
-    # Guardar en archivo
     report_path = paths["outputs"] / "report_2026.txt"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_text)
@@ -443,16 +643,19 @@ def main():
     # Paso 1: cargar resultados
     df = load_results(paths)
 
-    # Paso 2: gráfica principal
+    # Paso 2: gráfica principal (barras apiladas por ronda)
     plot_predictions_by_round(df, paths)
 
     # Paso 3: top 16 candidatos
     plot_top_candidates(df, paths)
 
-    # Paso 4: análisis por grupo
+    # Paso 4: análisis por grupo (organizado por bloque)
     plot_group_analysis(df, paths)
 
-    # Paso 5: reporte en texto
+    # Paso 5: bracket IZQ vs DER (nueva gráfica)
+    plot_bracket_comparison(df, paths)
+
+    # Paso 6: reporte en texto
     generate_text_report(df, paths)
 
     print("\n" + "="*55)
@@ -460,6 +663,7 @@ def main():
     print("  outputs/plots/predictions_by_round.png")
     print("  outputs/plots/top_candidates.png")
     print("  outputs/plots/group_analysis.png")
+    print("  outputs/plots/bracket_comparison.png  ← NUEVO")
     print("  outputs/report_2026.txt")
     print("="*55 + "\n")
 

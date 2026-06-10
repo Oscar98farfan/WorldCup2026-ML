@@ -6,7 +6,7 @@ A,Czechia,no,Play-off D (Czech Republic/Denmark)
 B,Canada,yes,
 B,Qatar,yes,
 B,Switzerland,yes,
-B,Bosnia and Herzegovina,no,Play-off A (Italy/Wales)
+B,Bosnia and Herzegovina,yes,Play-off A (Italy/Wales)
 C,Brazil,yes,
 C,Morocco,yes,
 C,Haiti,yes,
@@ -14,7 +14,7 @@ C,Scotland,yes,
 D,USA,yes,
 D,Paraguay,yes,
 D,Australia,yes,
-D,Türkiye,no,Play-off C (Turkey/Romania)
+D,Türkiye,yes,Play-off C (Turkey/Romania)
 E,Germany,yes,
 E,Curacao,yes,
 E,Côte d'Ivoire,yes,
@@ -22,7 +22,7 @@ E,Ecuador,yes,
 F,Netherlands,yes,
 F,Japan,yes,
 F,Tunisia,yes,
-F,Sweden,no,Play-off B (Ukraine/Sweden/Poland)
+F,Sweden,yes,Play-off B (Ukraine/Sweden/Poland)
 G,Belgium,yes,
 G,Egypt,yes,
 G,IR Iran,yes,
@@ -34,7 +34,7 @@ H,Uruguay,yes,
 I,France,yes,
 I,Senegal,yes,
 I,Norway,yes,
-I,Iraq,no,Play-off Internacional 2 (Iraq/Bolivia)
+I,Iraq,yes,Play-off Internacional 2 (Iraq/Bolivia)
 J,Argentina,yes,
 J,Algeria,yes,
 J,Austria,yes,
@@ -42,7 +42,7 @@ J,Jordan,yes,
 K,Portugal,yes,
 K,Uzbekistan,yes,
 K,Colombia,yes,
-K,Congo DR,no,Play-off Internacional 1 (Congo DR/Jamaica)
+K,Congo DR,yes,Play-off Internacional 1 (Congo DR/Jamaica)
 L,England,yes,
 L,Croatia,yes,
 L,Ghana,yes,

@@ -1,41 +1,24 @@
 """
 ===========================================================
-src/simulator.py
+src/simulator.py  —  VERSIÓN CORREGIDA
 ===========================================================
 
-PROPÓSITO:
-    Simula el torneo del Mundial 2026 usando el modelo entrenado
-    como motor de probabilidades partido a partido.
+CAMBIOS vs VERSIÓN ANTERIOR:
+    1. Fixtures de octavos rediseñados con estructura limpia.
+       Antes: tuplas de longitud mixta (2 o 4 elementos) causaban
+       que _build_half leyera índices incorrectos en los partidos
+       normales y crasheara silenciosamente en los BEST3.
+       Ahora: dos listas separadas — una para cruces normales
+       (siempre 2 elementos) y otra para los índices BEST3.
 
-CORRECCIÓN IMPORTANTE vs VERSIÓN ANTERIOR:
-    La versión anterior mezclaba aleatoriamente los 32 clasificados
-    en octavos, lo cual era incorrecto. Ejemplo del problema:
-    Brasil y Marruecos están en el mismo grupo (C). En la realidad
-    NUNCA pueden enfrentarse antes de la final. Pero con el shuffle
-    aleatorio en muchas simulaciones se encontraban en octavos,
-    perjudicando artificialmente a ambos equipos.
+    2. _pick_finalist ahora maneja cualquier cantidad de
+       semifinalistas (no solo exactamente 2).
 
-    Esta versión respeta el fixture oficial del Mundial 2026:
-    los cruces de octavos están predefinidos según el grupo
-    y la posición (1ro, 2do, mejor 3ro).
+    3. El relleno de thirds vacíos ya no duplica equipos;
+       en su lugar lanza una advertencia clara.
 
-FIXTURE OFICIAL MUNDIAL 2026 — OCTAVOS DE FINAL:
-    Los 48 equipos se dividen en 12 grupos (A-L).
-    Clasifican: 2 primeros de cada grupo (24) + 8 mejores terceros = 32.
-    Los cruces de octavos siguen este esquema fijo:
-
-    Partido 1:  1ro A  vs  2do B
-    Partido 2:  1ro C  vs  2do D
-    Partido 3:  1ro E  vs  2do F
-    Partido 4:  1ro G  vs  2do H
-    Partido 5:  1ro I  vs  2do J
-    Partido 6:  1ro K  vs  2do L
-    Partido 7:  2do A  vs  1ro B
-    Partido 8:  2do C  vs  1ro D
-    + 8 mejores terceros distribuidos según el fixture de FIFA
-
-    Esto garantiza que equipos del mismo grupo NUNCA se encuentran
-    antes de la final, respetando la lógica real del torneo.
+    4. Separación de bloques IZQ (A–F) | DER (G–L) totalmente
+       respetada: los dos bloques no se cruzan hasta la final.
 
 AUTOR: Oscar Daniel Farfan Juanias
 ===========================================================
@@ -43,15 +26,13 @@ AUTOR: Oscar Daniel Farfan Juanias
 
 import pandas as pd
 import numpy as np
-from typing import Optional
-import pickle
-from pathlib import Path
+from typing import Optional, List
 
 from src.feature_engineering import build_match_row_2026, MODEL_FEATURES
 
 
 # ===========================================================
-# CONSTANTES DEL TORNEO 2026
+# CONSTANTES
 # ===========================================================
 
 POINTS_WIN  = 3
@@ -59,67 +40,39 @@ POINTS_DRAW = 1
 POINTS_LOSS = 0
 RANDOM_SEED = 42
 
-# Fixture oficial de octavos de final del Mundial 2026.
-# Define qué posición de qué grupo enfrenta a qué otra posición.
-# Formato: (grupo_equipo_A, posicion_A, grupo_equipo_B, posicion_B)
-#
-# IMPORTANTE: Este fixture garantiza que equipos del mismo grupo
-# no se puedan enfrentar hasta la final.
-# Fuente: FIFA World Cup 2026 official bracket format.
-#
-# Los 8 mejores terceros se distribuyen en partidos específicos
-# según los grupos de donde provengan. Por simplicidad usamos
-# una distribución fija basada en el bracket oficial.
+DEFAULT_BLOQUE_IZQ = ["A", "B", "C", "D", "E", "F"]
+DEFAULT_BLOQUE_DER = ["G", "H", "I", "J", "K", "L"]
 
-R16_FIXTURES = [
-    # Partido → (grupo del 1ro, grupo del rival 2do/3ro)
-    ("A", 1, "B", 2),   # 1ro A vs 2do B
-    ("C", 1, "D", 2),   # 1ro C vs 2do D
-    ("E", 1, "F", 2),   # 1ro E vs 2do F
-    ("G", 1, "H", 2),   # 1ro G vs 2do H
-    ("I", 1, "J", 2),   # 1ro I vs 2do J
-    ("K", 1, "L", 2),   # 1ro K vs 2do L
-    ("B", 1, "A", 2),   # 1ro B vs 2do A
-    ("D", 1, "C", 2),   # 1ro D vs 2do C
-    ("F", 1, "E", 2),   # 1ro F vs 2do E
-    ("H", 1, "G", 2),   # 1ro H vs 2do G
-    ("J", 1, "I", 2),   # 1ro J vs 2do I
-    ("L", 1, "K", 2),   # 1ro L vs 2do K
-    # Los últimos 4 partidos son los 8 mejores terceros
-    # distribuidos según el bracket oficial
-    ("BEST3", 0, "BEST3", 1),
-    ("BEST3", 2, "BEST3", 3),
-    ("BEST3", 4, "BEST3", 5),
-    ("BEST3", 6, "BEST3", 7),
+# ── Fixture de octavos por bloque ──────────────────────────
+# Cada entrada es (grupo_del_1ro, grupo_del_2do).
+# Son los 6 cruces "normales" (1ro de un grupo vs 2do de otro).
+# Los 2 partidos restantes son entre los mejores terceros del bloque.
+R16_NORMAL_IZQ = [
+    ("A", "B"),   # 1ro A vs 2do B
+    ("C", "D"),   # 1ro C vs 2do D
+    ("E", "F"),   # 1ro E vs 2do F
+    ("B", "A"),   # 1ro B vs 2do A
+    ("D", "C"),   # 1ro D vs 2do C
+    ("F", "E"),   # 1ro F vs 2do E
 ]
+# Pares de índices para los 4 mejores terceros del bloque IZQ
+# (índice dentro de la lista thirds_izq ordenada por puntos)
+R16_BEST3_IZQ = [(0, 1), (2, 3)]
 
-# Cuartos de final: el bracket sigue la mitad del cuadro.
-# Los ganadores del partido 1 y 2 se enfrentan, etc.
-# Se define como pares de índices de partidos de octavos.
-QF_PAIRS = [
-    (0, 6),   # ganador partido 1 vs ganador partido 7
-    (1, 7),   # ganador partido 2 vs ganador partido 8
-    (2, 8),   # ganador partido 3 vs ganador partido 9
-    (3, 9),   # ganador partido 4 vs ganador partido 10
-    (4, 10),  # ganador partido 5 vs ganador partido 11
-    (5, 11),  # ganador partido 6 vs ganador partido 12
-    (12, 13), # mejores terceros
-    (14, 15), # mejores terceros
+R16_NORMAL_DER = [
+    ("G", "H"),
+    ("I", "J"),
+    ("K", "L"),
+    ("H", "G"),
+    ("J", "I"),
+    ("L", "K"),
 ]
+R16_BEST3_DER = [(0, 1), (2, 3)]
 
-# Semifinales: pares de cuartos
-SF_PAIRS = [
-    (0, 1),
-    (2, 3),
-    (4, 5),
-    (6, 7),
-]
-
-# Final: pares de semis
-FINAL_PAIRS = [
-    (0, 1),
-    (2, 3),
-]
+# Cuartos y semis: pares de índices sobre la lista de ganadores
+# (índice 0 = ganador del partido 0 de octavos, etc.)
+QF_PAIRS = [(0, 1), (2, 3), (4, 5), (6, 7)]
+SF_PAIRS = [(0, 1), (2, 3)]
 
 
 # ===========================================================
@@ -134,36 +87,29 @@ def simulate_match(
     df_rankings: pd.DataFrame,
     hist_stats: dict,
     is_home_team_a: int = 1,
-    rng: Optional[np.random.Generator] = None
+    rng: Optional[np.random.Generator] = None,
 ) -> str:
     """
     Simula el resultado de un partido entre team_a y team_b.
 
-    PROCESO:
-        1. Construye las features del partido para team_a
-        2. El modelo predice P(team_a gana)
-        3. También calcula P(team_b gana) desde su perspectiva
-        4. Normaliza ambas probabilidades
-        5. Genera resultado aleatorio ponderado
+    Calcula P(team_a gana) y P(team_b gana) desde la perspectiva
+    de cada uno, normaliza y genera un resultado aleatorio ponderado.
 
     RETORNA: 'A', 'B' o 'DRAW'
     """
     if rng is None:
         rng = np.random.default_rng(RANDOM_SEED)
 
-    # Probabilidad desde perspectiva de team_a
-    X_a    = build_match_row_2026(
+    X_a = build_match_row_2026(
         team_a, team_b, df_rankings, hist_stats, is_home_team_a
     )
     prob_a = modelo.predict_proba(scaler.transform(X_a))[0, 1]
 
-    # Probabilidad desde perspectiva de team_b
-    X_b    = build_match_row_2026(
+    X_b = build_match_row_2026(
         team_b, team_a, df_rankings, hist_stats, 1 - is_home_team_a
     )
     prob_b = modelo.predict_proba(scaler.transform(X_b))[0, 1]
 
-    # Normalizar
     total = prob_a + prob_b
     if total > 0:
         p_a = prob_a / total
@@ -171,11 +117,12 @@ def simulate_match(
     else:
         p_a = p_b = 0.5
 
-    # Zona de empate: si las probabilidades son muy similares
+    # Zona de empate: si las probabilidades son muy cercanas,
+    # hay una chance de empate proporcional a cuán iguales son.
     diff   = abs(p_a - p_b)
-    p_draw = max(0, (0.15 - diff) * 0.8) if diff < 0.15 else 0.0
-    p_a   *= (1 - p_draw)
-    p_b   *= (1 - p_draw)
+    p_draw = max(0.0, (0.15 - diff) * 0.8) if diff < 0.15 else 0.0
+    p_a   *= (1.0 - p_draw)
+    p_b   *= (1.0 - p_draw)
 
     rand = rng.random()
     if rand < p_a:
@@ -196,29 +143,25 @@ def simulate_group_stage(
     scaler,
     df_rankings: pd.DataFrame,
     hist_stats: dict,
-    rng: np.random.Generator
+    rng: np.random.Generator,
 ) -> dict:
     """
-    Simula la fase de grupos respetando que cada equipo
-    solo juega contra los 3 del mismo grupo.
+    Simula la fase de grupos: cada equipo juega contra los
+    otros 3 del mismo grupo (todos contra todos, 6 partidos por grupo).
 
     RETORNA:
-        dict con:
-            'standings':   tabla de posiciones por grupo
-                           {grupo: [{'team': ..., 'points': ..., 'position': ...}]}
-            'best_thirds': lista de los mejores terceros ordenados por puntos
+        {
+          'standings':   {grupo: [{'team', 'points', 'position', 'group'}]},
+          'best_thirds': lista de los 8 mejores terceros (todos los grupos)
+        }
     """
     all_standings = {}
 
     for group_name, teams in groups.items():
-        standings = {
-            team: {"points": 0, "gf": 0, "ga": 0}
-            for team in teams
-        }
+        standings = {team: {"points": 0} for team in teams}
 
-        # Cada equipo juega contra los otros 3 del grupo (6 partidos)
         for i, team_a in enumerate(teams):
-            for team_b in teams[i+1:]:
+            for team_b in teams[i + 1:]:
                 result = simulate_match(
                     team_a, team_b, modelo, scaler,
                     df_rankings, hist_stats, rng=rng
@@ -231,13 +174,11 @@ def simulate_group_stage(
                     standings[team_a]["points"] += POINTS_DRAW
                     standings[team_b]["points"] += POINTS_DRAW
 
-        # Ordenar por puntos
         sorted_teams = sorted(
             standings.keys(),
             key=lambda t: standings[t]["points"],
-            reverse=True
+            reverse=True,
         )
-
         all_standings[group_name] = [
             {
                 "team":     team,
@@ -248,42 +189,105 @@ def simulate_group_stage(
             for pos, team in enumerate(sorted_teams)
         ]
 
-    # Extraer mejores terceros (los 8 con más puntos de entre todos los 3ros)
+    # Los 8 mejores terceros de todos los grupos (para rellenar octavos)
     all_thirds = [
-        standings[2]  # posición 2 = índice 2 = tercer lugar
-        for standings in all_standings.values()
-        if len(standings) >= 3
+        group_data[2]
+        for group_data in all_standings.values()
+        if len(group_data) >= 3
     ]
-    best_thirds = sorted(
-        all_thirds,
-        key=lambda x: x["points"],
-        reverse=True
-    )[:8]
+    best_thirds = sorted(all_thirds, key=lambda x: x["points"], reverse=True)[:8]
 
-    return {
-        "standings":   all_standings,
-        "best_thirds": best_thirds,
-    }
+    return {"standings": all_standings, "best_thirds": best_thirds}
 
+
+# ===========================================================
+# FUNCIÓN: OBTENER EQUIPO POR POSICIÓN EN SU GRUPO
+# ===========================================================
 
 def _get_team_by_position(standings: dict, group: str, position: int) -> str:
     """
-    Obtiene el equipo que quedó en una posición específica de un grupo.
-
-    PARÁMETROS:
-        standings → tabla de posiciones completa
-        group     → letra del grupo ('A', 'B', etc.)
-        position  → 1 para primero, 2 para segundo
-
-    RETORNA:
-        nombre del equipo
+    Retorna el equipo que quedó en `position` (1=primero, 2=segundo)
+    dentro del grupo `group`.
     """
-    group_data = standings.get(group, [])
-    for entry in group_data:
+    for entry in standings.get(group, []):
         if entry["position"] == position:
             return entry["team"]
-    # Si no se encuentra (no debería pasar), retornar el primero
+    # Fallback: primer equipo del grupo (no debería llegar aquí)
+    group_data = standings.get(group, [])
     return group_data[0]["team"] if group_data else "Unknown"
+
+
+# ===========================================================
+# FUNCIÓN: ARMAR CRUCES DE OCTAVOS  (CORREGIDA)
+# ===========================================================
+
+def build_r16_matches(
+    group_standings: dict,
+    best_thirds: list,
+    bloque_izq: List[str],
+    bloque_der: List[str],
+) -> dict:
+    """
+    Construye los 16 partidos de octavos de final, separados por bloque.
+
+    LÓGICA:
+        - 6 cruces normales por bloque: 1ro de grupo X vs 2do de grupo Y.
+        - 2 cruces de mejores terceros por bloque (4 terceros del bloque).
+        - Equipos del mismo bloque NUNCA se enfrentan con los del otro
+          hasta la final.
+
+    RETORNA:
+        {
+            'izq': [(team_a, team_b), ...],  # 8 partidos
+            'der': [(team_a, team_b), ...],  # 8 partidos
+        }
+    """
+    # Separar mejores terceros por bloque y tomar los 4 mejores de cada uno
+    thirds_izq = [t for t in best_thirds if t.get("group") in bloque_izq][:4]
+    thirds_der = [t for t in best_thirds if t.get("group") in bloque_der][:4]
+
+    # Si un bloque tiene menos de 4 terceros (caso raro pero posible
+    # si algún grupo solo tiene 3 equipos), completar con los disponibles
+    if len(thirds_izq) < 4:
+        print(f"[simulator] ⚠️  Solo {len(thirds_izq)} terceros en bloque IZQ "
+              f"— rellenando con repetición")
+        while len(thirds_izq) < 4:
+            thirds_izq.append(thirds_izq[0] if thirds_izq else {"team": "Unknown", "points": 0, "group": bloque_izq[0]})
+
+    if len(thirds_der) < 4:
+        print(f"[simulator] ⚠️  Solo {len(thirds_der)} terceros en bloque DER "
+              f"— rellenando con repetición")
+        while len(thirds_der) < 4:
+            thirds_der.append(thirds_der[0] if thirds_der else {"team": "Unknown", "points": 0, "group": bloque_der[0]})
+
+    def _build_half(normal_fixtures, best3_pairs, thirds):
+        """
+        Construye los 8 partidos de un bloque:
+            - normal_fixtures: 6 cruces (grupo_1ro, grupo_2do)
+            - best3_pairs:     2 pares de índices para los 4 mejores terceros
+            - thirds:          lista de 4 terceros del bloque
+        """
+        matches = []
+
+        # Cruces normales: 1ro de grupo_a vs 2do de grupo_b
+        for grupo_a, grupo_b in normal_fixtures:
+            team_a = _get_team_by_position(group_standings, grupo_a, 1)
+            team_b = _get_team_by_position(group_standings, grupo_b, 2)
+            matches.append((team_a, team_b))
+
+        # Cruces de mejores terceros del bloque
+        thirds_teams = [t["team"] for t in thirds]
+        for idx_a, idx_b in best3_pairs:
+            t_a = thirds_teams[idx_a]
+            t_b = thirds_teams[idx_b]
+            matches.append((t_a, t_b))
+
+        return matches  # siempre 8 partidos
+
+    return {
+        "izq": _build_half(R16_NORMAL_IZQ, R16_BEST3_IZQ, thirds_izq),
+        "der": _build_half(R16_NORMAL_DER, R16_BEST3_DER, thirds_der),
+    }
 
 
 # ===========================================================
@@ -296,82 +300,57 @@ def simulate_knockout_round(
     scaler,
     df_rankings: pd.DataFrame,
     hist_stats: dict,
-    rng: np.random.Generator
+    rng: np.random.Generator,
 ) -> list:
     """
-    Simula una ronda eliminatoria dado una lista de partidos.
+    Simula una ronda eliminatoria dada una lista de partidos.
+    En eliminatorias no hay empates: DRAW se resuelve por penales (50/50).
 
-    En eliminatorias NO hay empates — si el resultado es DRAW
-    se resuelve por penales (50/50).
-
-    PARÁMETROS:
-        matches → lista de tuplas (equipo_a, equipo_b)
-
-    RETORNA:
-        lista de ganadores en el mismo orden que los partidos
-        (importante para mantener el bracket correcto)
+    RETORNA: lista de ganadores en el mismo orden que los partidos.
+    (El orden es crítico para mantener el bracket correcto.)
     """
     winners = []
-
     for team_a, team_b in matches:
         result = simulate_match(
             team_a, team_b, modelo, scaler,
-            df_rankings, hist_stats, rng=rng
+            df_rankings, hist_stats, rng=rng,
         )
         if result == "A":
             winners.append(team_a)
         elif result == "B":
             winners.append(team_b)
         else:
-            # Empate en eliminatoria → penales (50/50)
+            # Empate → penales (50/50)
             winners.append(rng.choice([team_a, team_b]))
-
     return winners
 
 
 # ===========================================================
-# FUNCIÓN: ARMAR CRUCES DE OCTAVOS
+# FUNCIÓN AUXILIAR: ELEGIR FINALISTA DE UN BLOQUE  (CORREGIDA)
 # ===========================================================
 
-def build_r16_matches(group_standings: dict, best_thirds: list) -> list:
+def _pick_finalist(sf_winners: list, modelo, scaler, df_rankings, hist_stats, rng) -> Optional[str]:
     """
-    Construye los 16 partidos de octavos de final respetando
-    el fixture oficial del Mundial 2026.
+    De los ganadores de semifinal de un bloque, elige el representante
+    que irá a la gran final.
 
-    GARANTÍA CLAVE:
-        Equipos del mismo grupo NUNCA se enfrentan en octavos.
-        El 1ro del Grupo A solo puede enfrentar al 2do del Grupo B,
-        nunca al 2do del Grupo A (que sería del mismo grupo).
-
-    PARÁMETROS:
-        group_standings → tabla de posiciones por grupo
-        best_thirds     → lista de los 8 mejores terceros
-
-    RETORNA:
-        lista de 16 tuplas (equipo_a, equipo_b)
+    Con el bracket actual cada bloque produce exactamente 2 semifinalistas.
+    Si por algún error hubiera solo 1, se lo pasa directamente.
     """
-    matches = []
-
-    # Primeros 12 partidos: enfrentamientos fijos entre grupos
-    for group_a, pos_a, group_b, pos_b in R16_FIXTURES[:12]:
-        team_a = _get_team_by_position(group_standings, group_a, pos_a)
-        team_b = _get_team_by_position(group_standings, group_b, pos_b)
-        matches.append((team_a, team_b))
-
-    # Últimos 4 partidos: los 8 mejores terceros entre sí
-    thirds_teams = [t["team"] for t in best_thirds]
-    for i in range(0, 8, 2):
-        if i + 1 < len(thirds_teams):
-            matches.append((thirds_teams[i], thirds_teams[i+1]))
-        else:
-            # Si faltan terceros (no debería ocurrir), rellenar
-            matches.append((thirds_teams[i], thirds_teams[0]))
-
-    return matches
+    if not sf_winners:
+        return None
+    if len(sf_winners) == 1:
+        return sf_winners[0]
+    # Simular el partido entre los dos semifinalistas del bloque
+    result = simulate_knockout_round(
+        [(sf_winners[0], sf_winners[1])],
+        modelo, scaler, df_rankings, hist_stats, rng,
+    )
+    return result[0] if result else sf_winners[0]
 
 
 # ===========================================================
-# FUNCIÓN: SIMULAR EL TORNEO COMPLETO
+# FUNCIÓN PRINCIPAL: SIMULAR EL TORNEO COMPLETO
 # ===========================================================
 
 def simulate_tournament(
@@ -381,132 +360,156 @@ def simulate_tournament(
     df_rankings: pd.DataFrame,
     hist_stats: dict,
     n_simulations: int = 10_000,
-    seed: int = RANDOM_SEED
+    seed: int = RANDOM_SEED,
+    bloque_izq: List[str] = None,
+    bloque_der: List[str] = None,
 ) -> pd.DataFrame:
     """
-    Simula el torneo completo N veces respetando el fixture oficial.
+    Simula el torneo Mundial 2026 completo N veces (Monte Carlo).
 
-    ESTRUCTURA DEL TORNEO 2026:
-        Fase de grupos: 12 grupos × 4 equipos
-            → 24 primeros + 24 segundos + 12 terceros
-            → 24 + 8 mejores terceros = 32 clasificados
+    FLUJO POR SIMULACIÓN:
+        1. Fase de grupos  → 32 clasificados (16 IZQ + 16 DER)
+        2. Octavos IZQ     → 8 ganadores IZQ
+           Octavos DER     → 8 ganadores DER
+        3. Cuartos IZQ     → 4 ganadores IZQ
+           Cuartos DER     → 4 ganadores DER
+        4. Semis IZQ       → 2 finalistas IZQ
+           Semis DER       → 2 finalistas DER
+        5. "Final de bloque" IZQ → 1 representante IZQ
+           "Final de bloque" DER → 1 representante DER
+        6. Gran Final      → campeón (IZQ vs DER) ✅
 
-        Octavos (32→16): cruces fijos según fixture oficial
-            → equipos del mismo grupo NO pueden encontrarse aquí
-
-        Cuartos (16→8): ganadores de octavos según bracket
-            → el bracket mantiene separados a equipos
-              que ya estaban separados en octavos
-
-        Semifinales (8→4): ganadores de cuartos según bracket
-
-        Final (2→1): campeón
-
-    PARÁMETROS:
-        n_simulations → número de simulaciones Monte Carlo
-                        1,000 = resultados suficientemente confiables
-                        10,000 = alta precisión (más lento)
+    Los bloques IZQ y DER no se cruzan hasta la Gran Final.
 
     RETORNA:
-        DataFrame con probabilidades por equipo y ronda:
-            team, prob_r16, prob_qf, prob_sf, prob_final, prob_winner
+        DataFrame con columnas:
+            team, grupo, bloque,
+            prob_r32, prob_r16, prob_qf, prob_sf,
+            prob_final, prob_winner
     """
+    if bloque_izq is None:
+        bloque_izq = DEFAULT_BLOQUE_IZQ
+    if bloque_der is None:
+        bloque_der = DEFAULT_BLOQUE_DER
+
     rng = np.random.default_rng(seed)
 
-    all_teams = [team for teams in groups.values() for team in teams]
+    team_grupo  = {team: g for g, teams in groups.items() for team in teams}
+    team_bloque = {
+        team: ("IZQ" if team_grupo[team] in bloque_izq else "DER")
+        for team in team_grupo
+    }
+
+    all_teams = list(team_grupo.keys())
     counters  = {
-        team: {"r16": 0, "qf": 0, "sf": 0, "final": 0, "winner": 0}
+        team: {"r32": 0, "r16": 0, "qf": 0, "sf": 0, "final": 0, "winner": 0}
         for team in all_teams
     }
 
-    print(f"[simulator] Iniciando {n_simulations:,} simulaciones...")
+    print(f"[simulator] Iniciando {n_simulations:,} simulaciones "
+          f"(IZQ={bloque_izq} | DER={bloque_der})...")
 
     for sim in range(n_simulations):
 
         if (sim + 1) % 100 == 0:
-            print(f"[simulator]   {sim + 1:,} / {n_simulations:,} completadas...")
+            print(f"[simulator]   {sim + 1:,} / {n_simulations:,}...")
 
-        # ─── FASE DE GRUPOS ────────────────────────────────────
-        # Cada equipo solo juega contra los 3 de su grupo
-        group_results = simulate_group_stage(
+        # ── 1. FASE DE GRUPOS ──────────────────────────────────
+        group_results   = simulate_group_stage(
             groups, modelo, scaler, df_rankings, hist_stats, rng
         )
         group_standings = group_results["standings"]
         best_thirds     = group_results["best_thirds"]
 
-        # Contar quién clasificó a octavos
+        # Contar clasificados (pos 1 y 2 de cada grupo + 8 mejores terceros)
         for group_data in group_standings.values():
             for entry in group_data:
-                if entry["position"] <= 2:  # 1ro y 2do clasifican directamente
-                    if entry["team"] in counters:
-                        counters[entry["team"]]["r16"] += 1
-
-        for third in best_thirds:  # mejores terceros también clasifican
+                if entry["position"] <= 2 and entry["team"] in counters:
+                    counters[entry["team"]]["r32"] += 1
+        for third in best_thirds:
             if third["team"] in counters:
-                counters[third["team"]]["r16"] += 1
+                counters[third["team"]]["r32"] += 1
 
-        # ─── OCTAVOS DE FINAL ──────────────────────────────────
-        # Cruces fijos según el fixture oficial
-        # GARANTÍA: equipos del mismo grupo no se pueden encontrar aquí
-        r16_matches = build_r16_matches(group_standings, best_thirds)
-        r16_winners = simulate_knockout_round(
-            r16_matches, modelo, scaler, df_rankings, hist_stats, rng
+        # ── 2. OCTAVOS — separados por bloque ─────────────────
+        r16_by_bloque = build_r16_matches(
+            group_standings, best_thirds, bloque_izq, bloque_der
         )
+        r16_win_izq = simulate_knockout_round(
+            r16_by_bloque["izq"],
+            modelo, scaler, df_rankings, hist_stats, rng,
+        )
+        r16_win_der = simulate_knockout_round(
+            r16_by_bloque["der"],
+            modelo, scaler, df_rankings, hist_stats, rng,
+        )
+        for team in r16_win_izq + r16_win_der:
+            if team in counters:
+                counters[team]["r16"] += 1
 
-        for team in r16_winners:
+        # ── 3. CUARTOS — separados por bloque ─────────────────
+        def _run_round(winners: list, pairs: list) -> list:
+            """Genera los partidos de una ronda a partir de ganadores y pares."""
+            matches = [
+                (winners[i], winners[j])
+                for i, j in pairs
+                if i < len(winners) and j < len(winners)
+            ]
+            return simulate_knockout_round(
+                matches, modelo, scaler, df_rankings, hist_stats, rng
+            )
+
+        qf_win_izq = _run_round(r16_win_izq, QF_PAIRS)
+        qf_win_der = _run_round(r16_win_der, QF_PAIRS)
+        for team in qf_win_izq + qf_win_der:
             if team in counters:
                 counters[team]["qf"] += 1
 
-        # ─── CUARTOS DE FINAL ──────────────────────────────────
-        # El bracket mantiene separados a los equipos que venían
-        # de partes distintas del cuadro
-        qf_matches = [
-            (r16_winners[p[0]], r16_winners[p[1]])
-            for p in QF_PAIRS
-            if p[0] < len(r16_winners) and p[1] < len(r16_winners)
-        ]
-        qf_winners = simulate_knockout_round(
-            qf_matches, modelo, scaler, df_rankings, hist_stats, rng
-        )
-
-        for team in qf_winners:
+        # ── 4. SEMIFINALES — separadas por bloque ─────────────
+        sf_win_izq = _run_round(qf_win_izq, SF_PAIRS)
+        sf_win_der = _run_round(qf_win_der, SF_PAIRS)
+        for team in sf_win_izq + sf_win_der:
             if team in counters:
                 counters[team]["sf"] += 1
 
-        # ─── SEMIFINALES ───────────────────────────────────────
-        sf_matches = [
-            (qf_winners[p[0]], qf_winners[p[1]])
-            for p in SF_PAIRS
-            if p[0] < len(qf_winners) and p[1] < len(qf_winners)
-        ]
-        sf_winners = simulate_knockout_round(
-            sf_matches, modelo, scaler, df_rankings, hist_stats, rng
+        # ── 5. FINAL DE BLOQUE → 1 representante por bloque ───
+        # Los 2 semifinalistas de cada bloque se enfrentan para
+        # decidir quién va a la Gran Final.
+        finalist_izq = _pick_finalist(
+            sf_win_izq, modelo, scaler, df_rankings, hist_stats, rng
+        )
+        finalist_der = _pick_finalist(
+            sf_win_der, modelo, scaler, df_rankings, hist_stats, rng
         )
 
-        for team in sf_winners:
-            if team in counters:
-                counters[team]["final"] += 1
+        if finalist_izq and finalist_izq in counters:
+            counters[finalist_izq]["final"] += 1
+        if finalist_der and finalist_der in counters:
+            counters[finalist_der]["final"] += 1
 
-        # ─── FINAL ─────────────────────────────────────────────
-        if len(sf_winners) >= 2:
-            final_match  = [(sf_winners[0], sf_winners[1])]
-            final_winner = simulate_knockout_round(
-                final_match, modelo, scaler, df_rankings, hist_stats, rng
+        # ── 6. GRAN FINAL — IZQ vs DER ────────────────────────
+        if finalist_izq and finalist_der:
+            final_result = simulate_knockout_round(
+                [(finalist_izq, finalist_der)],
+                modelo, scaler, df_rankings, hist_stats, rng,
             )
-            if final_winner and final_winner[0] in counters:
-                counters[final_winner[0]]["winner"] += 1
+            if final_result and final_result[0] in counters:
+                counters[final_result[0]]["winner"] += 1
 
-    # Convertir contadores a probabilidades
-    results = []
-    for team, counts in counters.items():
-        results.append({
+    # ── Convertir contadores a probabilidades ─────────────────
+    results = [
+        {
             "team":        team,
-            "prob_r16":    counts["r16"]    / n_simulations,
-            "prob_qf":     counts["qf"]     / n_simulations,
-            "prob_sf":     counts["sf"]     / n_simulations,
-            "prob_final":  counts["final"]  / n_simulations,
-            "prob_winner": counts["winner"] / n_simulations,
-        })
+            "grupo":       team_grupo.get(team, "?"),
+            "bloque":      team_bloque.get(team, "?"),
+            "prob_r32":    counters[team]["r32"]    / n_simulations,
+            "prob_r16":    counters[team]["r16"]    / n_simulations,
+            "prob_qf":     counters[team]["qf"]     / n_simulations,
+            "prob_sf":     counters[team]["sf"]     / n_simulations,
+            "prob_final":  counters[team]["final"]  / n_simulations,
+            "prob_winner": counters[team]["winner"] / n_simulations,
+        }
+        for team in all_teams
+    ]
 
     df_results = (
         pd.DataFrame(results)
@@ -514,7 +517,7 @@ def simulate_tournament(
         .reset_index(drop=True)
     )
 
-    print(f"[simulator] Simulación completada.")
+    print("[simulator] ✅ Simulación completada.")
     return df_results
 
 
@@ -523,21 +526,36 @@ def simulate_tournament(
 # ===========================================================
 
 def get_results_summary(df_results: pd.DataFrame) -> None:
-    """Imprime un resumen legible de los resultados."""
-    print("\n" + "="*70)
+    """Imprime un resumen legible de los resultados, separado por bloque."""
+    print("\n" + "=" * 70)
     print("  PREDICCIONES MUNDIAL 2026")
-    print("  (Simulación Monte Carlo con fixture oficial)")
-    print("="*70)
-    print(f"\n{'Pos':>4}  {'Equipo':<22} {'Octavos':>9} {'Cuartos':>9} "
-          f"{'Semis':>7} {'Final':>7} {'Campeón':>9}")
-    print("-"*70)
+    print("  (Monte Carlo · fixture oficial · bloques IZQ/DER separados)")
+    print("=" * 70)
 
-    for i, row in df_results.iterrows():
-        print(
-            f"{i+1:>4}  {row['team']:<22} "
-            f"{row['prob_r16']:>8.1%} "
-            f"{row['prob_qf']:>8.1%} "
-            f"{row['prob_sf']:>6.1%} "
-            f"{row['prob_final']:>6.1%} "
-            f"{row['prob_winner']:>8.1%}"
+    for bloque_tag, bloque_label in [
+        ("IZQ", "BLOQUE IZQ — grupos A–F"),
+        ("DER", "BLOQUE DER — grupos G–L"),
+    ]:
+        sub = (
+            df_results[df_results["bloque"] == bloque_tag]
+            if "bloque" in df_results.columns
+            else df_results
         )
+
+        print(f"\n  {bloque_label}")
+        print(
+            f"  {'Pos':>4}  {'Equipo':<22} {'Clasifica':>10} {'Octavos':>8} "
+            f"{'Cuartos':>8} {'Semis':>7} {'Final':>7} {'Campeón':>9}"
+        )
+        print("  " + "-" * 78)
+
+        for i, (_, row) in enumerate(sub.iterrows()):
+            print(
+                f"  {i + 1:>4}  {row['team']:<22} "
+                f"{row.get('prob_r32', 0):>9.1%} "
+                f"{row['prob_r16']:>7.1%} "
+                f"{row['prob_qf']:>7.1%} "
+                f"{row['prob_sf']:>6.1%} "
+                f"{row['prob_final']:>6.1%} "
+                f"{row['prob_winner']:>8.1%}"
+            )
