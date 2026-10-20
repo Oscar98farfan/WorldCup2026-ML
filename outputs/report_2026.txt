@@ -1,0 +1,193 @@
+==============================================================================================================
+  WORLDCUP2026-ML — PREDICCIONES MUNDIAL 2026
+==============================================================================================================
+
+  Modelo: logreg_full   |   Validación: walk-forward 1998, 2002, 2006, 2010, 2014, 2018, 2022
+  Simulaciones Monte Carlo: 20,000   |   Cuadro oficial FIFA (partidos 73–104)
+
+  RESULTADO REAL: España campeona (1-0 a Argentina en la prórroga). Semis: Francia e Inglaterra.
+
+--------------------------------------------------------------------------------------------------------------
+  1. MODELO NUEVO — los 48 equipos ordenados por probabilidad de ser campeón
+--------------------------------------------------------------------------------------------------------------
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Mexico                          97.8%        77.8%        53.8%        36.5%        24.1%        14.9%   Octavos       
+    2  USA                             97.2%        77.3%        55.4%        38.5%        23.6%        14.3%   Octavos       
+    3  France                          98.0%        76.6%        55.0%        36.5%        23.1%        14.2%   Semis         
+    4  Argentina                       97.5%        68.2%        48.3%        32.8%        18.5%        10.2%   Final         
+    5  Netherlands                     93.0%        59.9%        40.5%        22.5%        12.6%         6.6%   Dieciseisavos 
+    6  Brazil                          94.8%        59.3%        41.0%        22.2%        12.7%         6.5%   Octavos       
+    7  England                         93.2%        67.3%        38.3%        21.4%        11.7%         5.8%   Semis         
+    8  Belgium                         95.1%        65.1%        32.1%        18.3%         8.6%         3.8%   Cuartos       
+    9  Spain                           93.0%        53.2%        30.8%        16.1%         7.5%         3.2%   CAMPEÓN       
+   10  Germany                         93.8%        61.6%        30.4%        15.5%         7.5%         3.2%   Dieciseisavos 
+   11  Croatia                         87.2%        56.4%        29.1%        13.8%         6.4%         2.8%   Dieciseisavos 
+   12  Portugal                        91.8%        53.1%        29.6%        13.4%         5.7%         2.4%   Octavos       
+   13  Canada                          92.1%        55.8%        28.7%        12.7%         5.2%         2.1%   Octavos       
+   14  Uruguay                         89.3%        46.0%        24.5%        11.6%         4.9%         1.9%   Grupos        
+   15  Colombia                        88.0%        46.1%        23.3%         9.7%         3.8%         1.4%   Octavos       
+   16  Switzerland                     86.0%        45.3%        20.0%         7.9%         2.8%         0.9%   Cuartos       
+   17  Morocco                         77.7%        33.6%        17.2%         6.6%         2.6%         0.9%   Cuartos       
+   18  Sweden                          70.0%        29.8%        15.1%         5.7%         2.3%         0.7%   Dieciseisavos 
+   19  Japan                           64.9%        25.8%        12.6%         4.5%         1.6%         0.5%   Dieciseisavos 
+   20  Austria                         73.5%        28.6%        12.0%         4.4%         1.4%         0.4%   Dieciseisavos 
+   21  Senegal                         70.3%        33.3%        12.9%         4.4%         1.3%         0.4%   Dieciseisavos 
+   22  Korea Republic                  64.5%        30.7%        10.9%         3.8%         1.2%         0.3%   Grupos        
+   23  Czechia                         63.8%        30.6%        11.1%         3.9%         1.2%         0.3%   Grupos        
+   24  Paraguay                        57.0%        25.9%         9.2%         3.5%         1.0%         0.3%   Octavos       
+   25  Turkey                          56.9%        25.7%         8.7%         3.3%         1.0%         0.2%   Grupos        
+   26  IR Iran                         72.0%        30.9%         9.8%         3.4%         0.9%         0.2%   Grupos        
+   27  Ecuador                         70.2%        29.7%         9.7%         2.9%         0.9%         0.2%   Dieciseisavos 
+   28  Australia                       53.9%        23.2%         7.6%         2.7%         0.7%         0.1%   Dieciseisavos 
+   29  Scotland                        54.9%        17.0%         6.6%         1.9%         0.6%         0.1%   Grupos        
+   30  Panama                          49.2%        19.1%         6.5%         1.7%         0.5%         0.1%   Grupos        
+   31  Norway                          56.6%        22.6%         7.5%         2.0%         0.6%         0.1%   Cuartos       
+   32  Algeria                         61.2%        20.7%         6.9%         2.1%         0.6%         0.1%   Dieciseisavos 
+   33  Côte d'Ivoire                   59.6%        22.1%         6.3%         1.6%         0.4%         0.1%   Dieciseisavos 
+   34  Egypt                           60.8%        22.2%         6.2%         1.7%         0.4%         0.1%   Octavos       
+   35  Tunisia                         41.0%        12.2%         4.7%         1.4%         0.4%         0.1%   Grupos        
+   36  Congo DR                        47.8%        12.7%         3.6%         0.9%         0.2%         0.1%   Dieciseisavos 
+   37  Ghana                           37.7%        12.8%         4.2%         1.0%         0.3%         0.1%   Dieciseisavos 
+   38  Iraq                            39.1%        12.3%         3.1%         0.7%         0.1%         0.0%   Grupos        
+   39  Bosnia and Herzegovina          44.7%        12.3%         2.7%         0.6%         0.1%         0.0%   Dieciseisavos 
+   40  Haiti                           39.4%        10.0%         3.2%         0.8%         0.2%         0.0%   Grupos        
+   41  Saudi Arabia                    51.4%        13.0%         3.8%         1.0%         0.2%         0.0%   Grupos        
+   42  South Africa                    39.0%        13.8%         3.4%         0.8%         0.2%         0.0%   Dieciseisavos 
+   43  Qatar                           44.9%        12.1%         2.8%         0.6%         0.1%         0.0%   Grupos        
+   44  Curacao                         44.5%        13.5%         3.2%         0.7%         0.1%         0.0%   Grupos        
+   45  Cabo Verde                      33.5%         6.8%         1.6%         0.3%         0.1%         0.0%   Dieciseisavos 
+   46  New Zealand                     39.1%        10.7%         2.3%         0.5%         0.1%         0.0%   Grupos        
+   47  Uzbekistan                      40.1%         9.5%         2.3%         0.5%         0.1%         0.0%   Grupos        
+   48  Jordan                          33.4%         7.5%         1.7%         0.3%         0.0%         0.0%   Grupos        
+
+--------------------------------------------------------------------------------------------------------------
+  2. POR GRUPO (modelo nuevo)
+--------------------------------------------------------------------------------------------------------------
+
+  Grupo A
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Mexico                          97.8%        77.8%        53.8%        36.5%        24.1%        14.9%   Octavos       
+    2  Korea Republic                  64.5%        30.7%        10.9%         3.8%         1.2%         0.3%   Grupos        
+    3  Czechia                         63.8%        30.6%        11.1%         3.9%         1.2%         0.3%   Grupos        
+    4  South Africa                    39.0%        13.8%         3.4%         0.8%         0.2%         0.0%   Dieciseisavos 
+
+  Grupo B
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Canada                          92.1%        55.8%        28.7%        12.7%         5.2%         2.1%   Octavos       
+    2  Switzerland                     86.0%        45.3%        20.0%         7.9%         2.8%         0.9%   Cuartos       
+    3  Qatar                           44.9%        12.1%         2.8%         0.6%         0.1%         0.0%   Grupos        
+    4  Bosnia and Herzegovina          44.7%        12.3%         2.7%         0.6%         0.1%         0.0%   Dieciseisavos 
+
+  Grupo C
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Brazil                          94.8%        59.3%        41.0%        22.2%        12.7%         6.5%   Octavos       
+    2  Morocco                         77.7%        33.6%        17.2%         6.6%         2.6%         0.9%   Cuartos       
+    3  Scotland                        54.9%        17.0%         6.6%         1.9%         0.6%         0.1%   Grupos        
+    4  Haiti                           39.4%        10.0%         3.2%         0.8%         0.2%         0.0%   Grupos        
+
+  Grupo D
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  USA                             97.2%        77.3%        55.4%        38.5%        23.6%        14.3%   Octavos       
+    2  Paraguay                        57.0%        25.9%         9.2%         3.5%         1.0%         0.3%   Octavos       
+    3  Turkey                          56.9%        25.7%         8.7%         3.3%         1.0%         0.2%   Grupos        
+    4  Australia                       53.9%        23.2%         7.6%         2.7%         0.7%         0.1%   Dieciseisavos 
+
+  Grupo E
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Germany                         93.8%        61.6%        30.4%        15.5%         7.5%         3.2%   Dieciseisavos 
+    2  Ecuador                         70.2%        29.7%         9.7%         2.9%         0.9%         0.2%   Dieciseisavos 
+    3  Côte d'Ivoire                   59.6%        22.1%         6.3%         1.6%         0.4%         0.1%   Dieciseisavos 
+    4  Curacao                         44.5%        13.5%         3.2%         0.7%         0.1%         0.0%   Grupos        
+
+  Grupo F
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Netherlands                     93.0%        59.9%        40.5%        22.5%        12.6%         6.6%   Dieciseisavos 
+    2  Sweden                          70.0%        29.8%        15.1%         5.7%         2.3%         0.7%   Dieciseisavos 
+    3  Japan                           64.9%        25.8%        12.6%         4.5%         1.6%         0.5%   Dieciseisavos 
+    4  Tunisia                         41.0%        12.2%         4.7%         1.4%         0.4%         0.1%   Grupos        
+
+  Grupo G
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Belgium                         95.1%        65.1%        32.1%        18.3%         8.6%         3.8%   Cuartos       
+    2  IR Iran                         72.0%        30.9%         9.8%         3.4%         0.9%         0.2%   Grupos        
+    3  Egypt                           60.8%        22.2%         6.2%         1.7%         0.4%         0.1%   Octavos       
+    4  New Zealand                     39.1%        10.7%         2.3%         0.5%         0.1%         0.0%   Grupos        
+
+  Grupo H
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Spain                           93.0%        53.2%        30.8%        16.1%         7.5%         3.2%   CAMPEÓN       
+    2  Uruguay                         89.3%        46.0%        24.5%        11.6%         4.9%         1.9%   Grupos        
+    3  Saudi Arabia                    51.4%        13.0%         3.8%         1.0%         0.2%         0.0%   Grupos        
+    4  Cabo Verde                      33.5%         6.8%         1.6%         0.3%         0.1%         0.0%   Dieciseisavos 
+
+  Grupo I
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  France                          98.0%        76.6%        55.0%        36.5%        23.1%        14.2%   Semis         
+    2  Senegal                         70.3%        33.3%        12.9%         4.4%         1.3%         0.4%   Dieciseisavos 
+    3  Norway                          56.6%        22.6%         7.5%         2.0%         0.6%         0.1%   Cuartos       
+    4  Iraq                            39.1%        12.3%         3.1%         0.7%         0.1%         0.0%   Grupos        
+
+  Grupo J
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Argentina                       97.5%        68.2%        48.3%        32.8%        18.5%        10.2%   Final         
+    2  Austria                         73.5%        28.6%        12.0%         4.4%         1.4%         0.4%   Dieciseisavos 
+    3  Algeria                         61.2%        20.7%         6.9%         2.1%         0.6%         0.1%   Dieciseisavos 
+    4  Jordan                          33.4%         7.5%         1.7%         0.3%         0.0%         0.0%   Grupos        
+
+  Grupo K
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  Portugal                        91.8%        53.1%        29.6%        13.4%         5.7%         2.4%   Octavos       
+    2  Colombia                        88.0%        46.1%        23.3%         9.7%         3.8%         1.4%   Octavos       
+    3  Congo DR                        47.8%        12.7%         3.6%         0.9%         0.2%         0.1%   Dieciseisavos 
+    4  Uzbekistan                      40.1%         9.5%         2.3%         0.5%         0.1%         0.0%   Grupos        
+
+  Grupo L
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  England                         93.2%        67.3%        38.3%        21.4%        11.7%         5.8%   Semis         
+    2  Croatia                         87.2%        56.4%        29.1%        13.8%         6.4%         2.8%   Dieciseisavos 
+    3  Panama                          49.2%        19.1%         6.5%         1.7%         0.5%         0.1%   Grupos        
+    4  Ghana                           37.7%        12.8%         4.2%         1.0%         0.3%         0.1%   Dieciseisavos 
+
+--------------------------------------------------------------------------------------------------------------
+  3. BASELINE (solo ranking FIFA) — top 16
+--------------------------------------------------------------------------------------------------------------
+    #  Equipo                    Pasa grupos      Octavos      Cuartos        Semis        Final      Campeón   Real 2026     
+  ----------------------------------------------------------------------------------------------------------------------------
+    1  France                          97.4%        78.8%        61.9%        47.7%        34.1%        24.5%   Semis         
+    2  Spain                           96.5%        67.7%        47.4%        34.5%        21.4%        13.6%   CAMPEÓN       
+    3  Argentina                       93.9%        61.7%        43.2%        28.9%        17.0%         9.1%   Final         
+    4  England                         91.6%        61.9%        39.9%        24.1%        13.8%         7.3%   Semis         
+    5  Portugal                        90.4%        57.6%        36.3%        21.0%        11.4%         5.7%   Octavos       
+    6  Brazil                          89.3%        53.7%        33.6%        18.0%         9.6%         4.6%   Octavos       
+    7  Netherlands                     87.7%        50.7%        31.3%        16.0%         8.2%         4.0%   Dieciseisavos 
+    8  Morocco                         85.8%        48.4%        28.4%        14.3%         7.4%         3.2%   Cuartos       
+    9  Belgium                         87.2%        53.9%        30.0%        14.8%         7.0%         3.0%   Cuartos       
+   10  Germany                         86.5%        50.9%        23.2%        12.5%         5.7%         2.4%   Dieciseisavos 
+   11  Croatia                         79.5%        43.8%        22.7%        11.2%         5.0%         2.1%   Dieciseisavos 
+   12  Colombia                        77.7%        40.1%        20.4%        10.0%         4.4%         1.8%   Octavos       
+   13  Mexico                          81.5%        47.0%        22.0%         9.6%         4.2%         1.7%   Octavos       
+   14  Senegal                         71.2%        39.4%        19.9%         9.4%         4.2%         1.6%   Dieciseisavos 
+   15  USA                             76.3%        40.1%        19.2%         8.3%         3.5%         1.3%   Octavos       
+   16  Uruguay                         74.9%        33.9%        17.2%         8.2%         3.5%         1.3%   Grupos        
+
+--------------------------------------------------------------------------------------------------------------
+  4. EVALUACIÓN CONTRA EL MUNDIAL REAL (Brier medio por ronda, menor = mejor)
+--------------------------------------------------------------------------------------------------------------
+  Versión anterior (con fuga)    Brier 0.1165   puesto del campeón:  1   puesto del subcampeón: 45
+  Baseline solo ranking FIFA     Brier 0.0845   puesto del campeón:  2   puesto del subcampeón:  3
+  Modelo nuevo                   Brier 0.0888   puesto del campeón:  9   puesto del subcampeón:  4
+  Baseline solo ranking FIFA     eliminatorias: el favorito ganó 25 de 31
+  Modelo nuevo                   eliminatorias: el favorito ganó 19 de 31

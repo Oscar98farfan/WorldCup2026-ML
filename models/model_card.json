@@ -10,24 +10,24 @@
     "d_host",
     "d_home_conf"
   ],
-  "trained_at": "2026-10-20T14:40:32+00:00",
+  "trained_at": "2026-10-20T14:56:38+00:00",
   "validation": "walk-forward 1998, 2002, 2006, 2010, 2014, 2018, 2022",
   "metrics_walk_forward": [
     {
       "model": "logreg_full",
       "log_loss": 0.9830579558499171,
-      "rps": 0.20008591818643925,
+      "rps": 0.20008591818643923,
       "accuracy": 0.5379464285714286,
       "auc_win": 0.7302651630600427,
-      "log_loss_std_by_year": 0.05269935296441795
+      "log_loss_std_by_year": 0.052699352964417905
     },
     {
       "model": "gboost_full",
-      "log_loss": 0.9920559595490932,
-      "rps": 0.20298485240750366,
-      "accuracy": 0.5267857142857143,
-      "auc_win": 0.7080666463476583,
-      "log_loss_std_by_year": 0.0542182053927293
+      "log_loss": 0.9926250334139636,
+      "rps": 0.20278466914080956,
+      "accuracy": 0.53125,
+      "auc_win": 0.7083409529614955,
+      "log_loss_std_by_year": 0.05510643035656451
     },
     {
       "model": "baseline_rank",
@@ -39,7 +39,7 @@
     },
     {
       "model": "baseline_elo",
-      "log_loss": 1.017070583770958,
+      "log_loss": 1.0170705837709577,
       "rps": 0.2121542864683485,
       "accuracy": 0.5200892857142857,
       "auc_win": 0.6836330387077111,

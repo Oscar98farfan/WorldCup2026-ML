@@ -28,6 +28,8 @@ Objetivo de 3 clases (gana / empata / pierde). El acierto se compara contra 33% 
 
 ![Evaluación 2026](outputs/plots/evaluation_2026.png)
 
+![Probabilidad por ronda](outputs/plots/predictions_by_round.png)
+
 ## Qué se corrigió respecto a la versión anterior
 
 1. **Fuga de datos:** los goles del propio partido eran variable de entrada (63% de la importancia). En 2026 se rellenaban con 0, lo que el modelo leía como "perdió". Ahora el resultado solo se usa como etiqueta.
@@ -65,7 +67,8 @@ WorldCup2026-ML/
 │   ├── simulate.py          # Monte Carlo
 │   ├── evaluate.py          # comparación con el Mundial real
 │   ├── export.py            # JSON para la futura web/API
-│   ├── plots.py
+│   ├── plots.py             # gráficas en outputs/plots/
+│   ├── report.py            # outputs/report_2026.txt (los 48 equipos, por grupo)
 │   └── pipeline.py          # orquestación de pasos
 ├── data/raw/                # fuentes originales (no se modifican)
 ├── data/external/           # resultados reales 2026, salida de la versión anterior

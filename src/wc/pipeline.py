@@ -122,5 +122,9 @@ def step_evaluate() -> dict:
     (config.OUTPUTS_DIR / "plots").mkdir(parents=True, exist_ok=True)
     plots.plot_evaluation_2026()
     plots.plot_top_candidates()
+    plots.plot_predictions_by_round()
+    plots.plot_top_champions()
+    from .report import write_report
+    write_report()
     log.info("evaluate: %s", {k: round(v["mean"], 4) for k, v in result["torneo"].items()})
     return result

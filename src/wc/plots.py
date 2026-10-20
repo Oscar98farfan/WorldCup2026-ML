@@ -68,3 +68,43 @@ def plot_top_candidates(top: int = 12) -> None:
     fig.tight_layout()
     fig.savefig(config.OUTPUTS_DIR / "plots" / "prob_final_2026.png", dpi=140)
     plt.close(fig)
+
+
+def plot_predictions_by_round(top: int = 20) -> None:
+    """Tabla de calor: probabilidad de cada equipo de llegar a cada ronda."""
+    sim = pd.read_csv(config.OUTPUTS_DIR / "simulation_2026.csv").head(top)
+    vals = sim[[f"p_{r}" for r in ROUNDS]].values
+    fig, ax = plt.subplots(figsize=(9, 0.42 * top + 1.2), facecolor=SURFACE)
+    ax.imshow(vals, cmap="Blues", vmin=0, vmax=1, aspect="auto")
+    for i in range(vals.shape[0]):
+        for j in range(vals.shape[1]):
+            v = vals[i, j]
+            ax.text(j, i, f"{v:.0%}" if v >= 0.005 else "<1%", ha="center", va="center",
+                    fontsize=9, color="white" if v > 0.55 else INK)
+    ax.set_xticks(range(len(ROUNDS)), ROUND_ES, color=INK)
+    ax.set_yticks(range(top), [f"{t} ({g})" for t, g in zip(sim["team"], sim["group"])], color=INK)
+    ax.xaxis.tick_top()
+    for s in ax.spines.values():
+        s.set_visible(False)
+    ax.tick_params(length=0)
+    ax.set_title("Probabilidad de alcanzar cada ronda — Mundial 2026 (modelo nuevo)",
+                 loc="left", color=INK, fontsize=12, pad=28)
+    fig.tight_layout()
+    fig.savefig(config.OUTPUTS_DIR / "plots" / "predictions_by_round.png", dpi=140)
+    plt.close(fig)
+
+
+def plot_top_champions(top: int = 15) -> None:
+    sim = pd.read_csv(config.OUTPUTS_DIR / "simulation_2026.csv").head(top)[::-1]
+    fig, ax = plt.subplots(figsize=(8, 0.38 * top + 1.2), facecolor=SURFACE)
+    _style(ax)
+    ax.grid(axis="y", visible=False); ax.grid(axis="x", color="#ebeae6")
+    ax.barh(sim["team"], sim["p_champion"], color=SERIES["modelo_nuevo"], height=0.7)
+    for y, v in enumerate(sim["p_champion"]):
+        ax.text(v + 0.002, y, f"{v:.1%}", va="center", fontsize=9, color=INK)
+    ax.xaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))
+    ax.tick_params(axis="y", colors=INK)
+    ax.set_title("Probabilidad de ser campeón (antes del torneo)", loc="left", color=INK, fontsize=12)
+    fig.tight_layout()
+    fig.savefig(config.OUTPUTS_DIR / "plots" / "top_candidates.png", dpi=140)
+    plt.close(fig)
