@@ -1,0 +1,49 @@
+team,group,group_pos,stage,stage_name
+Mexico,A,1,2,R16
+South Africa,A,2,1,R32
+Korea Republic,A,3,0,group
+Czechia,A,4,0,group
+Switzerland,B,1,3,QF
+Canada,B,2,2,R16
+Bosnia and Herzegovina,B,3,1,R32
+Qatar,B,4,0,group
+Brazil,C,1,2,R16
+Morocco,C,2,3,QF
+Scotland,C,3,0,group
+Haiti,C,4,0,group
+USA,D,1,2,R16
+Australia,D,2,1,R32
+Paraguay,D,3,2,R16
+Turkey,D,4,0,group
+Germany,E,1,1,R32
+Côte d'Ivoire,E,2,1,R32
+Ecuador,E,3,1,R32
+Curacao,E,4,0,group
+Netherlands,F,1,1,R32
+Japan,F,2,1,R32
+Sweden,F,3,1,R32
+Tunisia,F,4,0,group
+Belgium,G,1,3,QF
+Egypt,G,2,2,R16
+IR Iran,G,3,0,group
+New Zealand,G,4,0,group
+Spain,H,1,6,champion
+Cabo Verde,H,2,1,R32
+Uruguay,H,3,0,group
+Saudi Arabia,H,4,0,group
+France,I,1,4,SF
+Norway,I,2,3,QF
+Senegal,I,3,1,R32
+Iraq,I,4,0,group
+Argentina,J,1,5,final
+Austria,J,2,1,R32
+Algeria,J,3,1,R32
+Jordan,J,4,0,group
+Colombia,K,1,2,R16
+Portugal,K,2,2,R16
+Congo DR,K,3,1,R32
+Uzbekistan,K,4,0,group
+England,L,1,4,SF
+Croatia,L,2,1,R32
+Ghana,L,3,1,R32
+Panama,L,4,0,group

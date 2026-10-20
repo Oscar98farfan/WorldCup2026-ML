@@ -1,0 +1,32 @@
+match,stage,team_a,team_b,winner,decided_by
+73,R32,South Africa,Canada,Canada,
+74,R32,Germany,Paraguay,Paraguay,penalties
+75,R32,Netherlands,Morocco,Morocco,
+76,R32,Brazil,Japan,Brazil,
+77,R32,France,Sweden,France,
+78,R32,Côte d'Ivoire,Norway,Norway,
+79,R32,Mexico,Ecuador,Mexico,
+80,R32,England,Congo DR,England,
+81,R32,USA,Bosnia and Herzegovina,USA,
+82,R32,Belgium,Senegal,Belgium,
+83,R32,Portugal,Croatia,Portugal,
+84,R32,Spain,Austria,Spain,
+85,R32,Switzerland,Algeria,Switzerland,
+86,R32,Argentina,Cabo Verde,Argentina,
+87,R32,Colombia,Ghana,Colombia,
+88,R32,Australia,Egypt,Egypt,
+89,R16,Paraguay,France,France,
+90,R16,Canada,Morocco,Morocco,
+91,R16,Brazil,Norway,Norway,
+92,R16,Mexico,England,England,
+93,R16,Portugal,Spain,Spain,
+94,R16,USA,Belgium,Belgium,
+95,R16,Argentina,Egypt,Argentina,
+96,R16,Switzerland,Colombia,Switzerland,penalties
+97,QF,France,Morocco,France,
+98,QF,Spain,Belgium,Spain,
+99,QF,Norway,England,England,extra_time
+100,QF,Argentina,Switzerland,Argentina,extra_time
+101,SF,France,Spain,Spain,
+102,SF,England,Argentina,Argentina,
+104,F,Spain,Argentina,Spain,extra_time

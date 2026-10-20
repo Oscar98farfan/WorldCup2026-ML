@@ -1,0 +1,57 @@
+{
+  "torneo": {
+    "modelo_nuevo": {
+      "r32": 0.16672609395833335,
+      "r16": 0.13583337625000003,
+      "qf": 0.11520619208333334,
+      "sf": 0.05667645375,
+      "final": 0.03673386333333334,
+      "champion": 0.02138746697916667,
+      "mean": 0.08876057439236114,
+      "p_actual_champion": 0.0324,
+      "p_actual_finalists_reach_final": 0.13005,
+      "rank_of_champion": 9,
+      "rank_of_runner_up": 4
+    },
+    "baseline_ranking": {
+      "r32": 0.1719061751041667,
+      "r16": 0.149891265625,
+      "qf": 0.09360479989583333,
+      "sf": 0.04268530083333333,
+      "final": 0.031274214479166666,
+      "champion": 0.017343846979166664,
+      "mean": 0.08445093381944445,
+      "p_actual_champion": 0.1357,
+      "p_actual_finalists_reach_final": 0.19222499999999998,
+      "rank_of_champion": 2,
+      "rank_of_runner_up": 3
+    },
+    "version_anterior": {
+      "r32": 0.23290614041666668,
+      "r16": 0.20155053083333332,
+      "qf": 0.13573314541666667,
+      "sf": 0.07324782750000002,
+      "final": 0.037860965,
+      "champion": 0.017747272499999998,
+      "mean": 0.11650764694444445,
+      "p_actual_champion": 0.0902,
+      "p_actual_finalists_reach_final": 0.07435,
+      "rank_of_champion": 1,
+      "rank_of_runner_up": 45
+    }
+  },
+  "eliminatorias": {
+    "modelo_nuevo": {
+      "n_matches": 31,
+      "log_loss": 0.5810768972426438,
+      "accuracy": 0.6129032258064516,
+      "favourite_won": 19
+    },
+    "baseline_ranking": {
+      "n_matches": 31,
+      "log_loss": 0.5185802773988378,
+      "accuracy": 0.8064516129032258,
+      "favourite_won": 25
+    }
+  }
+}

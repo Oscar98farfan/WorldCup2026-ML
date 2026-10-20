@@ -1,0 +1,22 @@
+# =============================================
+# WorldCup2026-ML — requirements.txt
+# =============================================
+# Instalar con: pip install -r requirements.txt
+
+# Datos y cálculo
+pandas==2.3.3
+numpy==2.3.3
+
+# Machine Learning
+scikit-learn==1.7.2
+
+# Visualización
+matplotlib==3.10.7
+seaborn==0.12.0
+
+# Serialización de modelos
+# (pickle viene incluido en Python, no necesita instalación)
+
+# Jupyter (opcional, para notebooks)
+#jupyter==1.0.0
+#ipykernel==6.25.0

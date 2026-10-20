@@ -1,0 +1,57 @@
+{
+  "model": "logreg_full",
+  "features": [
+    "d_elo",
+    "d_points_z",
+    "d_momentum",
+    "d_hist_stage",
+    "d_recent_stage",
+    "d_experience",
+    "d_host",
+    "d_home_conf"
+  ],
+  "trained_at": "2026-10-20T14:40:32+00:00",
+  "validation": "walk-forward 1998, 2002, 2006, 2010, 2014, 2018, 2022",
+  "metrics_walk_forward": [
+    {
+      "model": "logreg_full",
+      "log_loss": 0.9830579558499171,
+      "rps": 0.20008591818643925,
+      "accuracy": 0.5379464285714286,
+      "auc_win": 0.7302651630600427,
+      "log_loss_std_by_year": 0.05269935296441795
+    },
+    {
+      "model": "gboost_full",
+      "log_loss": 0.9920559595490932,
+      "rps": 0.20298485240750366,
+      "accuracy": 0.5267857142857143,
+      "auc_win": 0.7080666463476583,
+      "log_loss_std_by_year": 0.0542182053927293
+    },
+    {
+      "model": "baseline_rank",
+      "log_loss": 1.016153101770634,
+      "rps": 0.21183523020770614,
+      "accuracy": 0.5334821428571429,
+      "auc_win": 0.6948694503708219,
+      "log_loss_std_by_year": 0.041945731211730765
+    },
+    {
+      "model": "baseline_elo",
+      "log_loss": 1.017070583770958,
+      "rps": 0.2121542864683485,
+      "accuracy": 0.5200892857142857,
+      "auc_win": 0.6836330387077111,
+      "log_loss_std_by_year": 0.0415695858547256
+    },
+    {
+      "model": "climatology",
+      "log_loss": 1.0793559336292107,
+      "rps": 0.23591245777799066,
+      "accuracy": 0.33035714285714285,
+      "auc_win": 0.5143045819364015,
+      "log_loss_std_by_year": NaN
+    }
+  ]
+}
